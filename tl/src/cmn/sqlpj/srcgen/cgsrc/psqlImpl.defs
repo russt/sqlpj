@@ -1,0 +1,366 @@
+#
+#psqlImpl.defs -  definitions for psqlImpl object.
+#
+
+#allows us to run stand-alone:
+%ifndef CG_ROOT %include build_setup.defs
+
+{ ## header section
+PL_PACKAGE = $PSQLIMPL_PACKAGE
+PL_PACKAGE_DESCRIPTION = perl/jdbc sql command line interpreter
+
+#not a base class - use standard constuctor name:
+PL_CONSTRUCTOR_NAME = new
+
+PL_PKG_IMPORTS := << EOF
+use JDBC;
+EOF
+#%evalmacro PL_PKG_IMPORTS PL_PKG_IMPORTS
+
+PL_PKG_ATTRIBUTES := << EOF
+my $mPROMPT = $pkgname . "> ";
+EOF
+#%evalmacro PL_PKG_ATTRIBUTES PL_PKG_ATTRIBUTES
+}
+
+{ ## constructor section
+PL_CONSTRUCTOR_BODY := << EOF
+my ($url, $driver ,$user, $password) = @_;
+EOF
+#%evalmacro PL_CONSTRUCTOR_BODY PL_CONSTRUCTOR_BODY
+
+PL_OBJ_ATTRIBUTES := << EOF
+'mJdbcUrl'     => $url,
+'mJdbcDriver'  => $driver,
+'mUser'        => $user,
+'mPassword'    => $password,
+EOF
+#%evalmacro PL_OBJ_ATTRIBUTES PL_OBJ_ATTRIBUTES
+
+#this is for further initialzation of attributes, since hash init cannot be self-referential:
+PL_POST_ATTRIBUTE_INIT := << EOF
+EOF
+#%evalmacro PL_POST_ATTRIBUTE_INIT PL_POST_ATTRIBUTE_INIT
+}
+
+{ ## class methods
+
+#clear standard accessor accumulator:
+getset_methods =
+
+#generate read/write (get/set) accessors:
+#PL_ATTRIBUTE_NAME = XX
+#%evalmacro >> getset_methods pl_getsetlist
+
+#generate read-only attributes:
+PL_ATTRIBUTE_NAME = JdbcUrl
+%evalmacro >> getset_methods pl_attr_method
+PL_ATTRIBUTE_NAME = JdbcDriver
+%evalmacro >> getset_methods pl_attr_method
+PL_ATTRIBUTE_NAME = User
+%evalmacro >> getset_methods pl_attr_method
+PL_ATTRIBUTE_NAME = Password
+%evalmacro >> getset_methods pl_attr_method
+
+{
+PL_PKG_METHODS := << EOF
+# Check and initialize our jdbc driver class.
+# @return true if driver is in the CLASSPATH
+sub check_driver
+{
+    my ($self) = @_;
+
+	#initialize our driver class:
+#	if ( !defined(JDBC->load_driver($self->jdbcDriver())) ) {
+#		return 0;
+#	}
+
+	use Inline::Java qw(caught) ;
+
+print "T0\n";
+	eval {
+		JDBC->load_driver($self->jdbcDriver());
+	};
+print "T1\n";
+
+	if ($@) {
+print "T2\n";
+		if (caught("java.lang.Exception")){
+			my $msg = $@->getMessage() ;
+			print($msg . "\n") ; # prints ouch!
+		}
+		else{
+print "T5\n";
+			# It wasn't a Java exception after all...
+			#die $@ ;
+		}
+	}
+print "T9\n";
+	return 1;
+}
+#########
+#accessor methods for {=PL_PACKAGE=} object attributes:
+#########
+
+{=getset_methods=}
+EOF
+
+%evalmacro PL_PKG_METHODS PL_PKG_METHODS
+}
+
+{
+PL_PKG_UNTESTED METHODS := << EOF
+sub sqlsession
+# Parse and execute sql statements.  Grammar:
+# sqlsession     -> sql_statement* '<EOF>'
+# sql_statement  -> stuff ';' '<EOL>'
+#             -> stuff '<EOL>' 'go' ( '<EOL>' | '<EOF>' )
+#             -> stuff '<EOL>' ';' ( '<EOL>' | '<EOF>' )
+#             -> stuff '<EOF>'
+# Display prompts if session is interactive.
+# @param aFh is the input stream containing the sql statements.
+# @return false if error getting connection
+{
+    my ($self, $aFh, $fn) = @_;
+    my $sqlbuf = "";
+	my $lbuf = "";
+
+    printf STDERR "%s[sqlsession]: reading from file '%s'\n", $pkgname, $fn;
+
+    show_prompt();
+
+    if (!sql_init_connection()) {
+        printf STDERR ( "sqlsession:  cannot get a database connection:  ABORT");
+        return 0;
+    }
+
+    do {
+        lbuf = readline(aFh);
+
+        #if sql end-of-input detected on this line ...
+        if (sql_eoi(lbuf)) {
+            #... then append to current buffer
+            if (lbuf != null) {
+                lbuf = delete_sql_eoi(lbuf);
+                sqlbuf += lbuf + "\n";   #add back the newline
+            }
+
+            #if sqlbuf is not just a bunch of empty lines...
+            if (!whitespace(sqlbuf)) {
+                sql_exec(sqlbuf.toString());
+            }
+
+            #if not EOF..
+            if (lbuf != null) {
+                show_prompt();    #...then display next prompt
+            }
+
+            sqlbuf = "";    #reset the buffer
+        } else if (lbuf != null) {
+            sqlbuf += lbuf + "\n";   #save buf and continue
+        }
+
+    } while (lbuf != null);
+
+    sql_close_connection();
+
+    return true;
+}
+
+# Execute a single sql statement.
+# @param anSqlbuf is the buffer containing the input.
+sub sql_exec
+{
+    my ($self, $anSqlbuf) = @_;
+    printf STDERR ( anSqlbuf);
+
+    try
+    {
+        mStatement = mConnection.createStatement();
+        java.sql.ResultSet results = null;
+        int updateCount = -1;
+
+        #if we have results...
+        if (mStatement.execute(anSqlbuf)) {
+            results = mStatement.getResultSet();
+            log(sql_results_to_string(results));
+        } else {
+            #no results - see if we have an update count
+            updateCount = mStatement.getUpdateCount();
+            #if we have an update count...
+            if (updateCount != -1) {
+                if (!mQUIET) {
+                    log("update count " + updateCount);
+                }
+            }
+        }
+    }
+    catch (java.sql.SQLException e)
+    {
+        printf STDERR ( "Error while executing sql buffer: " + e.toString());
+    }
+}
+
+# Translate ResultSet to String representation
+# @param aResultSet as ResultSet
+# @return String the resulting String
+private String
+sub sql_results_to_string
+{
+    my ($self, java.sql.ResultSet aResultSet) = @_;
+    try {
+        if (aResultSet == null) {
+            #this is an error
+            return "(null)";
+        }
+
+        java.sql.ResultSetMetaData m = aResultSet.getMetaData();
+        int          col    = m.getColumnCount();
+        StringBuffer strbuf = new StringBuffer();
+        int          dispSize = -1;
+
+        for (int i = 1; i <= col; i++) {
+            strbuf = strbuf.append(m.getColumnLabel(i) + "\t");
+        }
+
+        strbuf = strbuf.append("\n");
+
+        while (aResultSet.next()) {
+            for (int i = 1; i <= col; i++) {
+                strbuf = strbuf.append(aResultSet.getString(i) + "\t");
+                if (aResultSet.wasNull()) {
+                    strbuf = strbuf.append("(null)\t");
+                }
+            }
+
+            strbuf = strbuf.append("\n");
+        }
+
+        return strbuf.toString();
+    } catch (java.sql.SQLException e) {
+        return null;
+    }
+}
+
+# open the jdbc connection.
+# @return true if successful.
+sub sql_init_connection
+{
+    int nerrs = 0;
+
+    try {
+        #try to get a connection:
+        mConnection = java.sql.DriverManager.getConnection(mURL, mUSER, mPASSWORD);
+    }
+    catch (java.sql.SQLException e)
+    {
+        printf STDERR ( "Cannot get a connection:  " + e.toString());
+        ++nerrs;
+    }
+
+    return (nerrs == 0);
+}
+
+# close the jdbc connection.
+sub sql_close_connection
+{
+    if (mConnection == null) {
+        return;
+    }
+
+    try {
+        mConnection.close();
+    }
+    catch (java.sql.SQLException e)
+    {
+        #don't care if this fails
+    }
+}
+
+sub sql_eoi
+# @return true if an end-of-input marker is found.
+# @param $aLine is the current line buffer.
+{
+    my ($self, $aLine) = @_;
+    my $res = 0;
+
+    #evaluate if EOF
+    if ($aLine == null) {
+        $res = 1;
+    } else {
+        $res = !($aLine.equals(delete_sql_eoi($aLine)));
+    }
+
+    printf STDERR "sql_eoi returned %d aLine='%s'\n", $res, $aLine;
+
+    return($res);
+}
+
+delete_sql_eoi(String $aLine)
+# @return new string without the sql end-of-input marker.
+# @param $aLine is the current line buffer.
+{
+    if ($aLine == null) {
+        return("");
+    }
+
+    $aLine = $aLine.replaceFirst(";[ \t;]*$", "");
+    $aLine = $aLine.replaceFirst("[ \t]*[gG][oO][ \t]*$", "");
+
+    return($aLine);
+}
+
+# read a line from <aFh>.  strip EOL char sequences.
+# @return null if EOF, o'wise the line.
+# @param aFh is the input stream.
+sub readline
+{
+    my ($self, InputStream aFh) = @_;
+    int bb = 0;
+    char cc;
+    long cnt = 0;
+    #initialize a buffer to hold lines:
+    StringBuffer abuf = new StringBuffer("");
+
+    try {
+        while ((bb = aFh.read()) != -1 ) {
+            ++cnt;
+            cc = (char) bb;
+
+            if (cc == '\n' || cc == '\r') {
+                break;    #EOL
+            } else {
+                abuf.append(cc);   #buffer the char.
+            }
+        }
+    } catch (Exception e) {
+        printf STDERR ( PKG + "[readline(InputStream)]: " + e.getMessage());
+        return null;
+    }
+
+    printf STDERR ( "read " + cnt + " bytes" + " abuf='" + abuf + "'");
+
+    if (bb != -1) {
+        return(abuf.toString());
+    }
+
+    return(null);
+}
+
+# display the current input prompt string.
+sub show_prompt
+{
+    if (mDOPROMPT) {
+        print(mPROMPT);
+    }
+}
+
+# @return true if <aStr> is only whitespace, empty, or null
+# @param aStr is the input string.
+sub whitespace
+{
+    my ($self, $aStr) = @_;
+    return(aStr == null || aStr.matches("[ \t\r\n]*"));
+}
+EOF
+}
