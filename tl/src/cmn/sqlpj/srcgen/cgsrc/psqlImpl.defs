@@ -14,6 +14,7 @@ PL_CONSTRUCTOR_NAME = new
 
 PL_PKG_IMPORTS := << EOF
 use JDBC;
+use Inline::Java qw(caught);
 EOF
 #%evalmacro PL_PKG_IMPORTS PL_PKG_IMPORTS
 
@@ -25,15 +26,17 @@ EOF
 
 { ## constructor section
 PL_CONSTRUCTOR_BODY := << EOF
-my ($url, $driver ,$user, $password) = @_;
+my ($url, $driver ,$user, $password, $prompt) = @_;
 EOF
 #%evalmacro PL_CONSTRUCTOR_BODY PL_CONSTRUCTOR_BODY
 
 PL_OBJ_ATTRIBUTES := << EOF
-'mJdbcUrl'     => $url,
 'mJdbcDriver'  => $driver,
+'mJdbcUrl'     => $url,
 'mUser'        => $user,
 'mPassword'    => $password,
+'mPrompt'      => $prompt,
+'mConnection'  => undef,
 EOF
 #%evalmacro PL_OBJ_ATTRIBUTES PL_OBJ_ATTRIBUTES
 
@@ -49,8 +52,8 @@ EOF
 getset_methods =
 
 #generate read/write (get/set) accessors:
-#PL_ATTRIBUTE_NAME = XX
-#%evalmacro >> getset_methods pl_getsetlist
+PL_ATTRIBUTE_NAME = Connection
+%evalmacro >> getset_methods pl_getset
 
 #generate read-only attributes:
 PL_ATTRIBUTE_NAME = JdbcUrl
@@ -61,55 +64,11 @@ PL_ATTRIBUTE_NAME = User
 %evalmacro >> getset_methods pl_attr_method
 PL_ATTRIBUTE_NAME = Password
 %evalmacro >> getset_methods pl_attr_method
+PL_ATTRIBUTE_NAME = Prompt
+%evalmacro >> getset_methods pl_attr_method
 
 {
 PL_PKG_METHODS := << EOF
-# Check and initialize our jdbc driver class.
-# @return true if driver is in the CLASSPATH
-sub check_driver
-{
-    my ($self) = @_;
-
-	#initialize our driver class:
-#	if ( !defined(JDBC->load_driver($self->jdbcDriver())) ) {
-#		return 0;
-#	}
-
-	use Inline::Java qw(caught) ;
-
-print "T0\n";
-	eval {
-		JDBC->load_driver($self->jdbcDriver());
-	};
-print "T1\n";
-
-	if ($@) {
-print "T2\n";
-		if (caught("java.lang.Exception")){
-			my $msg = $@->getMessage() ;
-			print($msg . "\n") ; # prints ouch!
-		}
-		else{
-print "T5\n";
-			# It wasn't a Java exception after all...
-			#die $@ ;
-		}
-	}
-print "T9\n";
-	return 1;
-}
-#########
-#accessor methods for {=PL_PACKAGE=} object attributes:
-#########
-
-{=getset_methods=}
-EOF
-
-%evalmacro PL_PKG_METHODS PL_PKG_METHODS
-}
-
-{
-PL_PKG_UNTESTED METHODS := << EOF
 sub sqlsession
 # Parse and execute sql statements.  Grammar:
 # sqlsession     -> sql_statement* '<EOF>'
@@ -122,245 +81,262 @@ sub sqlsession
 # @return false if error getting connection
 {
     my ($self, $aFh, $fn) = @_;
-    my $sqlbuf = "";
-	my $lbuf = "";
 
     printf STDERR "%s[sqlsession]: reading from file '%s'\n", $pkgname, $fn;
 
-    show_prompt();
-
-    if (!sql_init_connection()) {
-        printf STDERR ( "sqlsession:  cannot get a database connection:  ABORT");
+    if (!$self->sql_init_connection()) {
+        printf STDERR "%s:[sqlsession]:  cannot get a database connection:  ABORT\n", $pkgname;
         return 0;
     }
 
-    do {
-        lbuf = readline(aFh);
+    my $sqlbuf = "";
+	my $lbuf = "";
 
-        #if sql end-of-input detected on this line ...
-        if (sql_eoi(lbuf)) {
-            #... then append to current buffer
-            if (lbuf != null) {
-                lbuf = delete_sql_eoi(lbuf);
-                sqlbuf += lbuf + "\n";   #add back the newline
-            }
+	print $self->prompt();
 
-            #if sqlbuf is not just a bunch of empty lines...
-            if (!whitespace(sqlbuf)) {
-                sql_exec(sqlbuf.toString());
-            }
+    while ($lbuf = <$aFh>)
+	{
+		#append the buffer:
+		$sqlbuf .= $lbuf;
 
-            #if not EOF..
-            if (lbuf != null) {
-                show_prompt();    #...then display next prompt
-            }
+		#if it is time to execute the buffer ...
+		if ($sqlbuf =~ /;[;\s]*$/) {
+			#... then remove the semi-colon:
+			$sqlbuf =~ s/;[;\s]*$//;
 
-            sqlbuf = "";    #reset the buffer
-        } else if (lbuf != null) {
-            sqlbuf += lbuf + "\n";   #save buf and continue
-        }
+			#if the buffer has something in it, then send it to the database:
+            if ($sqlbuf !~ /^\s*$/) {
+                $self->sql_exec($sqlbuf);
 
-    } while (lbuf != null);
+				#display the results:
+			}
 
-    sql_close_connection();
+			#in any case, zero the buffer:
+			$sqlbuf = "";
+		}
 
-    return true;
+		print $self->prompt();
+    }
+
+    $self->sql_close_connection();
+
+    return 1;
 }
 
-# Execute a single sql statement.
-# @param anSqlbuf is the buffer containing the input.
 sub sql_exec
+# Execute a single sql statement.
+# @param sqlbuf is the buffer containing the input.
 {
-    my ($self, $anSqlbuf) = @_;
-    printf STDERR ( anSqlbuf);
+    my ($self, $sqlbuf) = @_;
 
-    try
-    {
-        mStatement = mConnection.createStatement();
-        java.sql.ResultSet results = null;
-        int updateCount = -1;
+    printf STDERR "sql_exec: buf='%s'\n", $sqlbuf;
+
+	my $stmt = undef;
+	my $con  = $self->getConnection();
+
+    eval {
+		$stmt = $con->createStatement();
+        #mStatement = mConnection.createStatement();
+
+        my $results = undef;
+        #java.sql.ResultSet results = null;
+
+        my $updateCount = -1;
 
         #if we have results...
-        if (mStatement.execute(anSqlbuf)) {
-            results = mStatement.getResultSet();
-            log(sql_results_to_string(results));
+        if ($stmt->execute($sqlbuf)) {
+            $results = $stmt->getResultSet();
+            print $self->sql_results_to_string($results);
         } else {
             #no results - see if we have an update count
-            updateCount = mStatement.getUpdateCount();
+            $updateCount = $stmt->getUpdateCount();
+
             #if we have an update count...
-            if (updateCount != -1) {
-                if (!mQUIET) {
-                    log("update count " + updateCount);
-                }
+            if ($updateCount != -1) {
+				printf "update count=%d\n", $updateCount;
             }
         }
-    }
-    catch (java.sql.SQLException e)
-    {
-        printf STDERR ( "Error while executing sql buffer: " + e.toString());
-    }
+    };
+
+	if ($@) {
+		if (caught("java.sql.SQLException")){
+			my $msg = $@->getMessage() ;
+			printf STDERR "%s[sql_exec]:  Java exception: execute: '%s'\n", $pkgname, $msg;
+		} else {
+			printf STDERR "%s[sql_exec]:  ERROR on execute: '%s'\n",$pkgname, $@;
+		}
+		return 0;
+	}
+
+	return 1;    #success
 }
 
+sub getColumns
+#return the list of column names for a result set
+{
+    my ($self, $rset) = @_;
+
+	return () unless defined($rset);
+
+	my (@header) = ();
+
+    eval {
+        my $m        = $rset->getMetaData();
+        my $colcnt   = $m->getColumnCount();
+
+		#store column headers:
+        for (my $ii = 1; $ii <= $colcnt; $ii++) {
+			push @header, $m->getColumnLabel($ii);
+        }
+    };
+
+	if ($@) {
+		if (caught("java.sql.SQLException")){
+			my $msg = $@->getMessage() ;
+			printf STDERR "%s[getColumns]:  Java exception: '%s'\n", $pkgname, $msg;
+		} else {
+			printf STDERR "%s[getColumns]:  ERROR: '%s'\n",$pkgname, $@;
+		}
+        return ();
+	}
+
+	return @header;
+}
+
+sub getRow
+#return the list of column names for a result set
+{
+    my ($self, $rset) = @_;
+
+	return () unless defined($rset);
+
+	my (@data) = ();
+
+    eval {
+        my $colcnt   = $rset->getMetaData()->getColumnCount();
+
+        for (my $ii = 1; $ii <= $colcnt; $ii++) {
+			push @data, ($rset->wasNull())? "(null)" : $rset->getString($ii);
+		}
+    };
+
+	if ($@) {
+		if (caught("java.sql.SQLException")){
+			my $msg = $@->getMessage() ;
+			printf STDERR "%s[getRow]:  Java exception: '%s'\n", $pkgname, $msg;
+		} else {
+			printf STDERR "%s[getRow]:  ERROR: '%s'\n",$pkgname, $@;
+		}
+        return ();
+	}
+
+	return @data;
+}
+
+sub sql_results_to_string
 # Translate ResultSet to String representation
 # @param aResultSet as ResultSet
 # @return String the resulting String
-private String
-sub sql_results_to_string
 {
-    my ($self, java.sql.ResultSet aResultSet) = @_;
-    try {
-        if (aResultSet == null) {
-            #this is an error
-            return "(null)";
-        }
+    my ($self, $rset) = @_;
 
-        java.sql.ResultSetMetaData m = aResultSet.getMetaData();
-        int          col    = m.getColumnCount();
-        StringBuffer strbuf = new StringBuffer();
-        int          dispSize = -1;
+	return "(null)" unless defined($rset);
 
-        for (int i = 1; i <= col; i++) {
-            strbuf = strbuf.append(m.getColumnLabel(i) + "\t");
-        }
+	my $rbuf = "";
 
-        strbuf = strbuf.append("\n");
+	$rbuf .= join("\t", $self->getColumns($rset)) . "\n";
 
-        while (aResultSet.next()) {
-            for (int i = 1; i <= col; i++) {
-                strbuf = strbuf.append(aResultSet.getString(i) + "\t");
-                if (aResultSet.wasNull()) {
-                    strbuf = strbuf.append("(null)\t");
-                }
-            }
+	#display data:
+	while ($rset->next()) {
+		$rbuf .= join("\t", $self->getRow($rset)) . "\n";
+	}
 
-            strbuf = strbuf.append("\n");
-        }
-
-        return strbuf.toString();
-    } catch (java.sql.SQLException e) {
-        return null;
-    }
+	return $rbuf;
 }
 
+# Check and initialize our jdbc driver class.
+# @return true if driver is in the CLASSPATH
+sub check_driver
+{
+    my ($self) = @_;
+
+	#initialize our driver class:
+	eval {
+		JDBC->load_driver($self->jdbcDriver());
+	};
+
+	if ($@) {
+		if (caught("java.lang.ClassNotFoundException")){
+			my $msg = $@->getMessage() ;
+			printf STDERR "%s[check_driver]:  Java exception: on JDBC->load_driver(%s): '%s'\n",$pkgname, $self->jdbcDriver(), $msg;
+			#xx = Class.forName(this.mDRIVER).toString();
+		} else {
+			printf STDERR "%s[check_driver]:  ERROR on JDBC->load_driver(%s): '%s'\n",$pkgname, $self->jdbcDriver(), $@;
+		}
+		return 0;
+	}
+
+	return 1;
+}
+
+sub sql_init_connection
 # open the jdbc connection.
 # @return true if successful.
-sub sql_init_connection
 {
-    int nerrs = 0;
+    my ($self) = @_;
 
-    try {
-        #try to get a connection:
-        mConnection = java.sql.DriverManager.getConnection(mURL, mUSER, mPASSWORD);
-    }
-    catch (java.sql.SQLException e)
-    {
-        printf STDERR ( "Cannot get a connection:  " + e.toString());
-        ++nerrs;
-    }
+	#try to get a connection:
+	eval {
+		$self->setConnection(JDBC->getConnection($self->jdbcUrl(), $self->user(), $self->password()));
+		#mConnection = java.sql.DriverManager.getConnection(mURL, mUSER, mPASSWORD);
+	};
 
-    return (nerrs == 0);
+	if ($@) {
+		if (caught("java.sql.SQLException")){
+			my $msg = $@->getMessage() ;
+			printf STDERR "%s[sql_init_connection]:  Java exception: on connect: '%s'\n", $pkgname, $msg;
+		} else {
+			printf STDERR "%s[sql_init_connection]:  ERROR on connect: '%s'\n",$pkgname, $@;
+		}
+		return 0;
+	}
+
+    return 1;    #success
 }
 
-# close the jdbc connection.
 sub sql_close_connection
+# close the jdbc connection.
+# true if successful
 {
-    if (mConnection == null) {
-        return;
-    }
+    my ($self) = @_;
 
-    try {
-        mConnection.close();
-    }
-    catch (java.sql.SQLException e)
-    {
-        #don't care if this fails
-    }
+	return unless defined($self->getConnection());
+
+	#close connection: #don't care if this fails
+	eval {
+		$self->getConnection()->close();
+	};
+
+	if ($@) {
+		if (caught("java.sql.SQLException")){
+			my $msg = $@->getMessage() ;
+			printf STDERR "%s[sql_close_connection]:  Java exception: on connect: '%s'\n", $pkgname, $msg;
+		} else {
+			printf STDERR "%s[sql_close_connection]:  ERROR on connect: '%s'\n",$pkgname, $@;
+		}
+		return 0;
+	}
+
+    return 1;    #success
 }
 
-sub sql_eoi
-# @return true if an end-of-input marker is found.
-# @param $aLine is the current line buffer.
-{
-    my ($self, $aLine) = @_;
-    my $res = 0;
+#########
+#accessor methods for {=PL_PACKAGE=} object attributes:
+#########
 
-    #evaluate if EOF
-    if ($aLine == null) {
-        $res = 1;
-    } else {
-        $res = !($aLine.equals(delete_sql_eoi($aLine)));
-    }
-
-    printf STDERR "sql_eoi returned %d aLine='%s'\n", $res, $aLine;
-
-    return($res);
-}
-
-delete_sql_eoi(String $aLine)
-# @return new string without the sql end-of-input marker.
-# @param $aLine is the current line buffer.
-{
-    if ($aLine == null) {
-        return("");
-    }
-
-    $aLine = $aLine.replaceFirst(";[ \t;]*$", "");
-    $aLine = $aLine.replaceFirst("[ \t]*[gG][oO][ \t]*$", "");
-
-    return($aLine);
-}
-
-# read a line from <aFh>.  strip EOL char sequences.
-# @return null if EOF, o'wise the line.
-# @param aFh is the input stream.
-sub readline
-{
-    my ($self, InputStream aFh) = @_;
-    int bb = 0;
-    char cc;
-    long cnt = 0;
-    #initialize a buffer to hold lines:
-    StringBuffer abuf = new StringBuffer("");
-
-    try {
-        while ((bb = aFh.read()) != -1 ) {
-            ++cnt;
-            cc = (char) bb;
-
-            if (cc == '\n' || cc == '\r') {
-                break;    #EOL
-            } else {
-                abuf.append(cc);   #buffer the char.
-            }
-        }
-    } catch (Exception e) {
-        printf STDERR ( PKG + "[readline(InputStream)]: " + e.getMessage());
-        return null;
-    }
-
-    printf STDERR ( "read " + cnt + " bytes" + " abuf='" + abuf + "'");
-
-    if (bb != -1) {
-        return(abuf.toString());
-    }
-
-    return(null);
-}
-
-# display the current input prompt string.
-sub show_prompt
-{
-    if (mDOPROMPT) {
-        print(mPROMPT);
-    }
-}
-
-# @return true if <aStr> is only whitespace, empty, or null
-# @param aStr is the input string.
-sub whitespace
-{
-    my ($self, $aStr) = @_;
-    return(aStr == null || aStr.matches("[ \t\r\n]*"));
-}
+{=getset_methods=}
 EOF
+
+%evalmacro PL_PKG_METHODS PL_PKG_METHODS
 }
+
