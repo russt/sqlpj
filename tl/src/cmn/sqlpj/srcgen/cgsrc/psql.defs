@@ -1,0 +1,116 @@
+%include build_setup.defs
+
+# psql.pl - prlskel program derived from template: perl/prlskel.ptpl
+
+{ ### psql defs
+PL_PACKAGE = $TESTDBI_PACKAGE
+PL_PACKAGE_DESCRIPTION = test the perl dbi, jdbc interfaces
+
+PL_PKG_IMPORTS = << EOF
+use $PSQLIMPL_PACKAGE;
+EOF
+
+PL_PKG_ATTRIBUTES := << EOF
+my $JDBC_URL      = "{=MOJAVE_INF_URL=}";
+my $DRIVER_CLASS  = "{=MYSQLDRV=}";
+my $USER          = "{=MOJAVE_INF_USER=}";
+my $PASSWORD      = "{=MOJAVE_INF_PASSWD=}";
+my $USE_STDIN = 1;
+my @SQLFILES = ();
+EOF
+%evalmacro PL_PKG_ATTRIBUTES PL_PKG_ATTRIBUTES
+}
+
+{
+PL_MAIN := << EOF
+# Generic jdbc script runner.
+my $psqlImpl = new {=PSQLIMPL_PACKAGE=} ($JDBC_URL, $DRIVER_CLASS . "x", $USER, $PASSWORD);
+
+#initialize our driver class:
+if (!$psqlImpl->check_driver()) {
+	printf STDERR "%s:  ERROR: JDBC driver '%s' is not available for url '%s', user '%s', password '%s'\n",
+		$pkgname, $psqlImpl->jdbcDriver(), $psqlImpl->jdbcUrl(), $psqlImpl->user(), $psqlImpl->password();
+	return 1;
+}
+
+return 0;
+
+if ($USE_STDIN) {
+	printf STDERR "%s:  using stdin\n";
+	my $stdinh = "STDIN";
+	$psqlImpl->sqlsession($stdinh, "<STDIN>");
+} else {
+	my $infile;
+	for (my $ii = 0; $ii <= $#SQLFILES; $ii++) {
+		if (open($infile, $SQLFILES[$ii])) {
+			$psqlImpl->sqlsession(\$infile, $SQLFILES[$ii]);
+			close $infile;
+		} else {
+			printf STDERR "%s:  ERROR: cannot open sql input, '%s':  '%s'\n", $pkgname, $SQLFILES[$ii], $!;
+		}
+	}
+}
+
+return 0;
+
+EOF
+%evalmacro PL_MAIN PL_MAIN
+}
+
+{ #subroutines
+PL_PKG_METHODS := << EOF
+EOF
+}
+
+{
+PL_PARSE_ARGS_PRE := << EOF
+EOF
+%evalmacro PL_PARSE_ARGS_PRE PL_PARSE_ARGS_PRE
+{
+{ #balance braces
+PL_PARSE_ARGS_LOOP := << EOF
+EOF
+} #balance braces
+} #end of parse arg loop defs
+
+PL_PARSE_ARGS_POST := << EOF
+EOF
+} #end of parse arg defs
+
+{
+PL_USAGE := << EOF
+Usage:  $p [options] [file ...]
+
+SYNOPSIS
+  Creates a new database connection and runs each
+  sql file provided on the command line.  If none
+  present, then prompts for sql statements on stdin.
+
+  Sql statements will be executed when the input contains a
+  'go' or ';' command delimiter. These delimiters must
+  appear at the end of the line or alone on a line. If no
+  delimiters are provided, then statements are executed on EOF.
+
+OPTIONS
+  -help             Display this help message.
+  -verbose          Display additional informational messages.
+  -debug            Display debug messages.
+  -ddebug           Display deep debug messages.
+  -quiet            Display severe errors only.
+  -prompt string    Use <string> as prompt instead of default.
+  -user name        Username used for connection
+  -password string  Password for this user
+  -driver classname Name of the driver class
+  -url name         Jdbc connection url
+
+ENVIRONMENT
+ CLASSPATH      you must have the database jdbc driver in your classpath
+
+EXAMPLE
+  $p -url jdbc:oracle:thin:\@pipit.sfbay.sun.com:1521:FORTE \\
+     -driver oracle.jdbc.driver.OracleDriver -user system -password manager foo.sql
+EOF
+
+%evalmacro PL_USAGE PL_USAGE
+}
+
