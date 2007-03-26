@@ -17,6 +17,7 @@ my $USER          = "{=MOJAVE_INF_USER=}";
 my $PASSWORD      = "{=MOJAVE_INF_PASSWD=}";
 my $USE_STDIN = 1;
 my @SQLFILES = ();
+my $PROMPT = "psql> ";
 EOF
 %evalmacro PL_PKG_ATTRIBUTES PL_PKG_ATTRIBUTES
 }
@@ -24,7 +25,7 @@ EOF
 {
 PL_MAIN := << EOF
 # Generic jdbc script runner.
-my $psqlImpl = new {=PSQLIMPL_PACKAGE=} ($JDBC_URL, $DRIVER_CLASS . "x", $USER, $PASSWORD);
+my $psqlImpl = new {=PSQLIMPL_PACKAGE=} ($JDBC_URL, $DRIVER_CLASS, $USER, $PASSWORD, $PROMPT);
 
 #initialize our driver class:
 if (!$psqlImpl->check_driver()) {
@@ -33,10 +34,8 @@ if (!$psqlImpl->check_driver()) {
 	return 1;
 }
 
-return 0;
-
 if ($USE_STDIN) {
-	printf STDERR "%s:  using stdin\n";
+	printf STDERR "%s:  using stdin\n", $pkgname;
 	my $stdinh = "STDIN";
 	$psqlImpl->sqlsession($stdinh, "<STDIN>");
 } else {
