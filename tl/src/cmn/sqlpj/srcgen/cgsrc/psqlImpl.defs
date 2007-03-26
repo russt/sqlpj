@@ -129,7 +129,7 @@ sub sql_exec
 {
     my ($self, $sqlbuf) = @_;
 
-    printf STDERR "sql_exec: buf='%s'\n", $sqlbuf;
+#printf STDERR "sql_exec: buf='%s'\n", $sqlbuf;
 
 	my $stmt = undef;
 	my $con  = $self->getConnection();
@@ -146,7 +146,7 @@ sub sql_exec
         #if we have results...
         if ($stmt->execute($sqlbuf)) {
             $results = $stmt->getResultSet();
-            print $self->sql_results_to_string($results);
+            $self->displayResultSet($results);
         } else {
             #no results - see if we have an update count
             $updateCount = $stmt->getUpdateCount();
@@ -171,87 +171,58 @@ sub sql_exec
 	return 1;    #success
 }
 
-sub getColumns
-#return the list of column names for a result set
-{
-    my ($self, $rset) = @_;
-
-	return () unless defined($rset);
-
-	my (@header) = ();
-
-    eval {
-        my $m        = $rset->getMetaData();
-        my $colcnt   = $m->getColumnCount();
-
-		#store column headers:
-        for (my $ii = 1; $ii <= $colcnt; $ii++) {
-			push @header, $m->getColumnLabel($ii);
-        }
-    };
-
-	if ($@) {
-		if (caught("java.sql.SQLException")){
-			my $msg = $@->getMessage() ;
-			printf STDERR "%s[getColumns]:  Java exception: '%s'\n", $pkgname, $msg;
-		} else {
-			printf STDERR "%s[getColumns]:  ERROR: '%s'\n",$pkgname, $@;
-		}
-        return ();
-	}
-
-	return @header;
-}
-
-sub getRow
-#return the list of column names for a result set
-{
-    my ($self, $rset) = @_;
-
-	return () unless defined($rset);
-
-	my (@data) = ();
-
-    eval {
-        my $colcnt   = $rset->getMetaData()->getColumnCount();
-
-        for (my $ii = 1; $ii <= $colcnt; $ii++) {
-			push @data, ($rset->wasNull())? "(null)" : $rset->getString($ii);
-		}
-    };
-
-	if ($@) {
-		if (caught("java.sql.SQLException")){
-			my $msg = $@->getMessage() ;
-			printf STDERR "%s[getRow]:  Java exception: '%s'\n", $pkgname, $msg;
-		} else {
-			printf STDERR "%s[getRow]:  ERROR: '%s'\n",$pkgname, $@;
-		}
-        return ();
-	}
-
-	return @data;
-}
-
-sub sql_results_to_string
-# Translate ResultSet to String representation
-# @param aResultSet as ResultSet
-# @return String the resulting String
+sub displayResultSet
+# display resultSet <rset>
 {
     my ($self, $rset) = @_;
 
 	return "(null)" unless defined($rset);
 
-	my $rbuf = "";
+	#we first make a pass to get all the rows into memory:
+	my @allrows = ();
+	
+	#save column headers:
+	push @allrows, [&getColumns($rset)];
 
-	$rbuf .= join("\t", $self->getColumns($rset)) . "\n";
-
-	#display data:
+	#save data rows:
 	while ($rset->next()) {
-		$rbuf .= join("\t", $self->getRow($rset)) . "\n";
+		push @allrows, [&getRow($rset)];
 	}
 
-	return $rbuf;
+	#next, we iterate through the rows to set the max column size:
+	my (@sizes) = ();
+	for my $rowref (@allrows) {
+		&setMaxColumnSizes(\@sizes, $rowref);
+	}
+
+	#generate a format spec based on display sizes:
+	my $fmt = "|";
+	my $total = 0;
+	for my $sz (@sizes) {
+		$fmt .= "%-" . "$sz" . "s|";
+		$total +=  $sz;
+	}
+
+	#create a row divider:
+	my $divider =  "+" . "-" x ($#sizes + $total) . "+" . "\n";
+
+#printf STDERR "fmt='%s' divider=\n%s\n", $fmt, $divider;
+
+	#######
+	#column headers:
+	#######
+	my $rowref =  shift(@allrows);
+	print $divider;
+	printf $fmt. "\n", @{$rowref};
+	print $divider;
+
+	#display data:
+	while (defined($rowref =  shift(@allrows))) {
+		printf $fmt. "\n", @{$rowref};
+	}
+	print $divider;
+
+	return 1;    #success
 }
 
 # Check and initialize our jdbc driver class.
@@ -329,6 +300,132 @@ sub sql_close_connection
 
     return 1;    #success
 }
+
+#######
+#static class methods
+#######
+
+sub getColumns
+#return the list of column names for a result set
+{
+    my ($rset) = @_;
+
+	return () unless defined($rset);
+
+	my (@header) = ();
+
+    eval {
+        my $m        = $rset->getMetaData();
+        my $colcnt   = $m->getColumnCount();
+
+		#store column headers:
+        for (my $ii = 1; $ii <= $colcnt; $ii++) {
+			push @header, $m->getColumnLabel($ii);
+        }
+    };
+
+	if ($@) {
+		if (caught("java.sql.SQLException")){
+			my $msg = $@->getMessage() ;
+			printf STDERR "%s[getColumns]:  Java exception: '%s'\n", $pkgname, $msg;
+		} else {
+			printf STDERR "%s[getColumns]:  ERROR: '%s'\n",$pkgname, $@;
+		}
+        return ();
+	}
+
+	return @header;
+}
+
+sub getColumnSizes
+#return the list of column display sizes for a result set
+{
+    my ($rset) = @_;
+
+	return () unless defined($rset);
+
+	my (@widths) = ();
+
+    eval {
+        my $m        = $rset->getMetaData();
+        my $colcnt   = $m->getColumnCount();
+
+        for (my $ii = 1; $ii <= $colcnt; $ii++) {
+			push @widths, $m->getColumnDisplaySize($ii);
+        }
+    };
+
+	if ($@) {
+		if (caught("java.sql.SQLException")){
+			my $msg = $@->getMessage() ;
+			printf STDERR "%s[getColumns]:  Java exception: '%s'\n", $pkgname, $msg;
+		} else {
+			printf STDERR "%s[getColumns]:  ERROR: '%s'\n",$pkgname, $@;
+		}
+        return ();
+	}
+
+	return @widths;
+}
+
+sub getRow
+#return the list of column names for a result set
+{
+    my ($rset) = @_;
+
+	return () unless defined($rset);
+
+	my (@data) = ();
+
+    eval {
+        my $colcnt   = $rset->getMetaData()->getColumnCount();
+
+        for (my $ii = 1; $ii <= $colcnt; $ii++) {
+			push @data, ($rset->wasNull())? "(null)" : $rset->getString($ii);
+		}
+    };
+
+	if ($@) {
+		if (caught("java.sql.SQLException")){
+			my $msg = $@->getMessage() ;
+			printf STDERR "%s[getRow]:  Java exception: '%s'\n", $pkgname, $msg;
+		} else {
+			printf STDERR "%s[getRow]:  ERROR: '%s'\n",$pkgname, $@;
+		}
+        return ();
+	}
+
+	return @data;
+}
+
+sub setMaxColumnSizes
+#set each element in <szref> to be max(curr, new) width for display
+{
+	my ($szref, $rowref) = @_;
+
+	my @sizes = @{$szref};
+	my @data =  @{$rowref};
+
+	if ($#sizes != $#data) {
+		#initialize sizes:
+		@sizes = (0) x ($#data + 1);
+	}
+
+	for (my $ii = 0; $ii <= $#data; $ii++) {
+		$sizes[$ii] = &maxwidth( $sizes[$ii], length(sprintf("%s", $data[$ii])) );
+	}
+
+	@{$szref} = @sizes;
+}
+
+sub maxwidth
+#return the max of two numbers
+{
+	my ($ii, $jj) = @_;
+
+	return (($ii >= $jj)? $ii : $jj);
+}
+
 
 #########
 #accessor methods for {=PL_PACKAGE=} object attributes:
