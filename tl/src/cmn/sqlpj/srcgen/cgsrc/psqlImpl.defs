@@ -37,6 +37,7 @@ PL_OBJ_ATTRIBUTES := << EOF
 'mPassword'    => $password,
 'mPrompt'      => $prompt,
 'mConnection'  => undef,
+'mMetaData'    => undef,
 EOF
 #%evalmacro PL_OBJ_ATTRIBUTES PL_OBJ_ATTRIBUTES
 
@@ -53,6 +54,8 @@ getset_methods =
 
 #generate read/write (get/set) accessors:
 PL_ATTRIBUTE_NAME = Connection
+%evalmacro >> getset_methods pl_getset
+PL_ATTRIBUTE_NAME = MetaData
 %evalmacro >> getset_methods pl_getset
 
 #generate read-only attributes:
@@ -90,32 +93,38 @@ sub sqlsession
     }
 
     my $sqlbuf = "";
-	my $lbuf = "";
+    my $lbuf = "";
 
-	print $self->prompt();
+    print $self->prompt();
 
     while ($lbuf = <$aFh>)
-	{
-		#append the buffer:
-		$sqlbuf .= $lbuf;
+    {
+        #we implement a few local commands just for fun:
+        if ($self->localCommand($lbuf)) {
+            print $self->prompt();
+            next;
+        }
 
-		#if it is time to execute the buffer ...
-		if ($sqlbuf =~ /;[;\s]*$/) {
-			#... then remove the semi-colon:
-			$sqlbuf =~ s/;[;\s]*$//;
+        #append the buffer:
+        $sqlbuf .= $lbuf;
 
-			#if the buffer has something in it, then send it to the database:
+        #if it is time to execute the buffer ...
+        if ($sqlbuf =~ /;[;\s]*$/) {
+            #... then remove the semi-colon:
+            $sqlbuf =~ s/;[;\s]*$//;
+
+            #if the buffer has something in it, then send it to the database:
             if ($sqlbuf !~ /^\s*$/) {
                 $self->sql_exec($sqlbuf);
 
-				#display the results:
-			}
+                #display the results:
+            }
 
-			#in any case, zero the buffer:
-			$sqlbuf = "";
-		}
+            #in any case, zero the buffer:
+            $sqlbuf = "";
+        }
 
-		print $self->prompt();
+        print $self->prompt();
     }
 
     $self->sql_close_connection();
@@ -131,11 +140,11 @@ sub sql_exec
 
 #printf STDERR "sql_exec: buf='%s'\n", $sqlbuf;
 
-	my $stmt = undef;
-	my $con  = $self->getConnection();
+    my $stmt = undef;
+    my $con  = $self->getConnection();
 
     eval {
-		$stmt = $con->createStatement();
+        $stmt = $con->createStatement();
         #mStatement = mConnection.createStatement();
 
         my $results = undef;
@@ -153,22 +162,22 @@ sub sql_exec
 
             #if we have an update count...
             if ($updateCount != -1) {
-				printf "update count=%d\n", $updateCount;
+                printf "update count=%d\n", $updateCount;
             }
         }
     };
 
-	if ($@) {
-		if (caught("java.sql.SQLException")){
-			my $msg = $@->getMessage() ;
-			printf STDERR "%s[sql_exec]:  Java exception: execute: '%s'\n", $pkgname, $msg;
-		} else {
-			printf STDERR "%s[sql_exec]:  ERROR on execute: '%s'\n",$pkgname, $@;
-		}
-		return 0;
-	}
+    if ($@) {
+        if (caught("java.sql.SQLException")){
+            my $msg = $@->getMessage() ;
+            printf STDERR "%s[sql_exec]:  Java exception: execute: '%s'\n", $pkgname, $msg;
+        } else {
+            printf STDERR "%s[sql_exec]:  ERROR on execute: '%s'\n",$pkgname, $@;
+        }
+        return 0;
+    }
 
-	return 1;    #success
+    return 1;    #success
 }
 
 sub displayResultSet
@@ -176,53 +185,53 @@ sub displayResultSet
 {
     my ($self, $rset) = @_;
 
-	return "(null)" unless defined($rset);
+    return "(null)" unless defined($rset);
 
-	#we first make a pass to get all the rows into memory:
-	my @allrows = ();
-	
-	#save column headers:
-	push @allrows, [&getColumns($rset)];
+    #we first make a pass to get all the rows into memory:
+    my @allrows = ();
+    
+    #save column headers:
+    push @allrows, [&getColumns($rset)];
 
-	#save data rows:
-	while ($rset->next()) {
-		push @allrows, [&getRow($rset)];
-	}
+    #save data rows:
+    while ($rset->next()) {
+        push @allrows, [&getRow($rset)];
+    }
 
-	#next, we iterate through the rows to set the max column size:
-	my (@sizes) = ();
-	for my $rowref (@allrows) {
-		&setMaxColumnSizes(\@sizes, $rowref);
-	}
+    #next, we iterate through the rows to set the max column size:
+    my (@sizes) = ();
+    for my $rowref (@allrows) {
+        &setMaxColumnSizes(\@sizes, $rowref);
+    }
 
-	#generate a format spec based on display sizes:
-	my $fmt = "|";
-	my $total = 0;
-	for my $sz (@sizes) {
-		$fmt .= "%-" . "$sz" . "s|";
-		$total +=  $sz;
-	}
+    #generate a format spec based on display sizes:
+    my $fmt = "|";
+    my $total = 0;
+    for my $sz (@sizes) {
+        $fmt .= "%-" . "$sz" . "s|";
+        $total +=  $sz;
+    }
 
-	#create a row divider:
-	my $divider =  "+" . "-" x ($#sizes + $total) . "+" . "\n";
+    #create a row divider:
+    my $divider =  "+" . "-" x ($#sizes + $total) . "+" . "\n";
 
 #printf STDERR "fmt='%s' divider=\n%s\n", $fmt, $divider;
 
-	#######
-	#column headers:
-	#######
-	my $rowref =  shift(@allrows);
-	print $divider;
-	printf $fmt. "\n", @{$rowref};
-	print $divider;
+    #######
+    #column headers:
+    #######
+    my $rowref =  shift(@allrows);
+    print $divider;
+    printf $fmt. "\n", @{$rowref};
+    print $divider;
 
-	#display data:
-	while (defined($rowref =  shift(@allrows))) {
-		printf $fmt. "\n", @{$rowref};
-	}
-	print $divider;
+    #display data:
+    while (defined($rowref =  shift(@allrows))) {
+        printf $fmt. "\n", @{$rowref};
+    }
+    print $divider;
 
-	return 1;    #success
+    return 1;    #success
 }
 
 # Check and initialize our jdbc driver class.
@@ -231,23 +240,23 @@ sub check_driver
 {
     my ($self) = @_;
 
-	#initialize our driver class:
-	eval {
-		JDBC->load_driver($self->jdbcDriver());
-	};
+    #initialize our driver class:
+    eval {
+        JDBC->load_driver($self->jdbcDriver());
+    };
 
-	if ($@) {
-		if (caught("java.lang.ClassNotFoundException")){
-			my $msg = $@->getMessage() ;
-			printf STDERR "%s[check_driver]:  Java exception: on JDBC->load_driver(%s): '%s'\n",$pkgname, $self->jdbcDriver(), $msg;
-			#xx = Class.forName(this.mDRIVER).toString();
-		} else {
-			printf STDERR "%s[check_driver]:  ERROR on JDBC->load_driver(%s): '%s'\n",$pkgname, $self->jdbcDriver(), $@;
-		}
-		return 0;
-	}
+    if ($@) {
+        if (caught("java.lang.ClassNotFoundException")){
+            my $msg = $@->getMessage() ;
+            printf STDERR "%s[check_driver]:  Java exception: on JDBC->load_driver(%s): '%s'\n",$pkgname, $self->jdbcDriver(), $msg;
+            #xx = Class.forName(this.mDRIVER).toString();
+        } else {
+            printf STDERR "%s[check_driver]:  ERROR on JDBC->load_driver(%s): '%s'\n",$pkgname, $self->jdbcDriver(), $@;
+        }
+        return 0;
+    }
 
-	return 1;
+    return 1;
 }
 
 sub sql_init_connection
@@ -256,21 +265,24 @@ sub sql_init_connection
 {
     my ($self) = @_;
 
-	#try to get a connection:
-	eval {
-		$self->setConnection(JDBC->getConnection($self->jdbcUrl(), $self->user(), $self->password()));
-		#mConnection = java.sql.DriverManager.getConnection(mURL, mUSER, mPASSWORD);
-	};
+    #try to get a connection:
+    eval {
+        $self->setConnection(JDBC->getConnection($self->jdbcUrl(), $self->user(), $self->password()));
+        #mConnection = java.sql.DriverManager.getConnection(mURL, mUSER, mPASSWORD);
 
-	if ($@) {
-		if (caught("java.sql.SQLException")){
-			my $msg = $@->getMessage() ;
-			printf STDERR "%s[sql_init_connection]:  Java exception: on connect: '%s'\n", $pkgname, $msg;
-		} else {
-			printf STDERR "%s[sql_init_connection]:  ERROR on connect: '%s'\n",$pkgname, $@;
-		}
-		return 0;
-	}
+        #also set a handle for DatabaseMetaData:
+        $self->setMetaData( $self->getConnection()->getMetaData() );
+    };
+
+    if ($@) {
+        if (caught("java.sql.SQLException")){
+            my $msg = $@->getMessage() ;
+            printf STDERR "%s[sql_init_connection]:  Java exception: on connect: '%s'\n", $pkgname, $msg;
+        } else {
+            printf STDERR "%s[sql_init_connection]:  ERROR on connect: '%s'\n",$pkgname, $@;
+        }
+        return 0;
+    }
 
     return 1;    #success
 }
@@ -281,22 +293,22 @@ sub sql_close_connection
 {
     my ($self) = @_;
 
-	return unless defined($self->getConnection());
+    return unless defined($self->getConnection());
 
-	#close connection: #don't care if this fails
-	eval {
-		$self->getConnection()->close();
-	};
+    #close connection: #don't care if this fails
+    eval {
+        $self->getConnection()->close();
+    };
 
-	if ($@) {
-		if (caught("java.sql.SQLException")){
-			my $msg = $@->getMessage() ;
-			printf STDERR "%s[sql_close_connection]:  Java exception: on connect: '%s'\n", $pkgname, $msg;
-		} else {
-			printf STDERR "%s[sql_close_connection]:  ERROR on connect: '%s'\n",$pkgname, $@;
-		}
-		return 0;
-	}
+    if ($@) {
+        if (caught("java.sql.SQLException")){
+            my $msg = $@->getMessage() ;
+            printf STDERR "%s[sql_close_connection]:  Java exception: on connect: '%s'\n", $pkgname, $msg;
+        } else {
+            printf STDERR "%s[sql_close_connection]:  ERROR on connect: '%s'\n",$pkgname, $@;
+        }
+        return 0;
+    }
 
     return 1;    #success
 }
@@ -310,31 +322,31 @@ sub getColumns
 {
     my ($rset) = @_;
 
-	return () unless defined($rset);
+    return () unless defined($rset);
 
-	my (@header) = ();
+    my (@header) = ();
 
     eval {
         my $m        = $rset->getMetaData();
         my $colcnt   = $m->getColumnCount();
 
-		#store column headers:
+        #store column headers:
         for (my $ii = 1; $ii <= $colcnt; $ii++) {
-			push @header, $m->getColumnLabel($ii);
+            push @header, $m->getColumnLabel($ii);
         }
     };
 
-	if ($@) {
-		if (caught("java.sql.SQLException")){
-			my $msg = $@->getMessage() ;
-			printf STDERR "%s[getColumns]:  Java exception: '%s'\n", $pkgname, $msg;
-		} else {
-			printf STDERR "%s[getColumns]:  ERROR: '%s'\n",$pkgname, $@;
-		}
+    if ($@) {
+        if (caught("java.sql.SQLException")){
+            my $msg = $@->getMessage() ;
+            printf STDERR "%s[getColumns]:  Java exception: '%s'\n", $pkgname, $msg;
+        } else {
+            printf STDERR "%s[getColumns]:  ERROR: '%s'\n",$pkgname, $@;
+        }
         return ();
-	}
+    }
 
-	return @header;
+    return @header;
 }
 
 sub getColumnSizes
@@ -342,30 +354,30 @@ sub getColumnSizes
 {
     my ($rset) = @_;
 
-	return () unless defined($rset);
+    return () unless defined($rset);
 
-	my (@widths) = ();
+    my (@widths) = ();
 
     eval {
         my $m        = $rset->getMetaData();
         my $colcnt   = $m->getColumnCount();
 
         for (my $ii = 1; $ii <= $colcnt; $ii++) {
-			push @widths, $m->getColumnDisplaySize($ii);
+            push @widths, $m->getColumnDisplaySize($ii);
         }
     };
 
-	if ($@) {
-		if (caught("java.sql.SQLException")){
-			my $msg = $@->getMessage() ;
-			printf STDERR "%s[getColumns]:  Java exception: '%s'\n", $pkgname, $msg;
-		} else {
-			printf STDERR "%s[getColumns]:  ERROR: '%s'\n",$pkgname, $@;
-		}
+    if ($@) {
+        if (caught("java.sql.SQLException")){
+            my $msg = $@->getMessage() ;
+            printf STDERR "%s[getColumns]:  Java exception: '%s'\n", $pkgname, $msg;
+        } else {
+            printf STDERR "%s[getColumns]:  ERROR: '%s'\n",$pkgname, $@;
+        }
         return ();
-	}
+    }
 
-	return @widths;
+    return @widths;
 }
 
 sub getRow
@@ -373,59 +385,221 @@ sub getRow
 {
     my ($rset) = @_;
 
-	return () unless defined($rset);
+    return () unless defined($rset);
 
-	my (@data) = ();
+    my (@data) = ();
 
     eval {
         my $colcnt   = $rset->getMetaData()->getColumnCount();
 
         for (my $ii = 1; $ii <= $colcnt; $ii++) {
-			push @data, ($rset->wasNull())? "(null)" : $rset->getString($ii);
-		}
+            #note - you have to do the fetch first, which sets wasNull() for the current column.
+            my $str = $rset->getString($ii);
+            push @data, ($rset->wasNull())? "(null)" : $str;
+        }
     };
 
-	if ($@) {
-		if (caught("java.sql.SQLException")){
-			my $msg = $@->getMessage() ;
-			printf STDERR "%s[getRow]:  Java exception: '%s'\n", $pkgname, $msg;
-		} else {
-			printf STDERR "%s[getRow]:  ERROR: '%s'\n",$pkgname, $@;
-		}
+    if ($@) {
+        if (caught("java.sql.SQLException")){
+            my $msg = $@->getMessage() ;
+            printf STDERR "%s[getRow]:  Java exception: '%s'\n", $pkgname, $msg;
+        } else {
+            printf STDERR "%s[getRow]:  ERROR: '%s'\n",$pkgname, $@;
+        }
         return ();
-	}
+    }
 
-	return @data;
+    return @data;
 }
 
 sub setMaxColumnSizes
 #set each element in <szref> to be max(curr, new) width for display
 {
-	my ($szref, $rowref) = @_;
+    my ($szref, $rowref) = @_;
 
-	my @sizes = @{$szref};
-	my @data =  @{$rowref};
+    my @sizes = @{$szref};
+    my @data =  @{$rowref};
 
-	if ($#sizes != $#data) {
-		#initialize sizes:
-		@sizes = (0) x ($#data + 1);
-	}
+    if ($#sizes != $#data) {
+        #initialize sizes:
+        @sizes = (0) x ($#data + 1);
+    }
 
-	for (my $ii = 0; $ii <= $#data; $ii++) {
-		$sizes[$ii] = &maxwidth( $sizes[$ii], length(sprintf("%s", $data[$ii])) );
-	}
+    for (my $ii = 0; $ii <= $#data; $ii++) {
+        $sizes[$ii] = &maxwidth( $sizes[$ii], length(sprintf("%s", $data[$ii])) );
+    }
 
-	@{$szref} = @sizes;
+    @{$szref} = @sizes;
 }
 
 sub maxwidth
 #return the max of two numbers
 {
-	my ($ii, $jj) = @_;
+    my ($ii, $jj) = @_;
 
-	return (($ii >= $jj)? $ii : $jj);
+    return (($ii >= $jj)? $ii : $jj);
 }
 
+######
+#local command processing
+######
+
+sub localCommand
+#process a local command:
+#    help
+#    info
+{
+    my ($self, $buf) = @_;
+
+    #trim buf:
+    $buf =~ s/^\s+//;
+    $buf =~ s/[;\s]*$//;
+
+    if ($buf =~ /^help/i) {
+        $buf =~ s/help\s*//i;
+        $self->helpCommand($buf);
+    } elsif ($buf  =~ /^info/i) {
+        $buf =~ s/info\s*//i;
+        $self->infoCommand($buf);
+    } elsif ($buf  =~ /^tables/i) {
+        $buf =~ s/tables\s*//i;
+        $self->tablesCommand($buf);
+    } else {
+        return 0;    #not a local command
+    }
+
+    return 1;    #we found and processed a local command
+}
+
+sub helpCommand
+{
+    my ($self, $args) = @_;
+
+    print <<"!";
+Local commands are:
+ help          - show this message
+ info          - show database meta information
+ tables [db]   - show information about tables in <db>, defaultinf to connection db.
+!
+}
+
+sub tablesCommand
+#implement the tables command, which shows information about tables
+{
+    my ($self, $dbname) = @_;
+#'getTables(String catalog, String schemaPattern, String tableNamePattern, String types[])'  => 'ResultSet',
+#'getSuperTables(String catalog, String schemaPattern, String tableNamePattern)'  => 'ResultSet',
+
+    my $dbMetaData = $self->getMetaData();
+
+    my $rseta = undef;
+    my $rsetb = undef;
+    my $rsetc = undef;
+
+    #this seems to show tables from the connection db, irregardless:
+    #$dbname = undef;
+    eval {
+        $rseta = $dbMetaData->getTables($dbname, "%", "%", []);
+        $rsetb = $dbMetaData->getSuperTables($dbname, "%", "%");
+        $rsetc = $dbMetaData->getSuperTypes($dbname, "%", "%");
+        #$rseta = $dbMetaData->getTables("null", "", "", "");
+        #$rsetb = $dbMetaData->getTables("inftest", "", "cvs2inf_error_defs", undef);
+        #$rsetc = $dbMetaData->getTables("inftest", "*", "cvs2inf_error_defs", undef);
+    };
+
+    if ($@) {
+        if (caught("java.sql.SQLException")){
+            my $msg = $@->getMessage() ;
+            printf STDERR "%s[tablesCommand]:  Java exception: '%s'\n", $pkgname, $msg;
+        } else {
+            printf STDERR "%s[tablesCommand]:  ERROR: '%s'\n",$pkgname, $@;
+        }
+        return;
+    }
+
+    $self->displayResultSet($rseta);
+    $self->displayResultSet($rsetb);
+    $self->displayResultSet($rsetc);
+}
+
+sub infoCommand
+#implement the info command, which exercises the DatabaseMetaData class.
+{
+    my ($self, $args) = @_;
+
+    #try if from a hash:
+    my %metafuncs = (
+{=%include dbmeta.defs=}
+    );
+
+    my (@noargkeys)     = grep($_ =~ /\(\)$/, sort keys %metafuncs);
+    my (@yesargkeys)    = grep($_ !~ /\(\)$/, sort keys %metafuncs);
+    my (@boolkeys)      = grep($metafuncs{$_} eq "boolean", @noargkeys);
+    my (@intkeys)       = grep($metafuncs{$_} eq "int", @noargkeys);
+    my (@strkeys)       = grep($metafuncs{$_} eq "String", @noargkeys);
+    my (@resultSetkeys) = grep($metafuncs{$_} eq "ResultSet", @noargkeys);
+
+    my $divider =  "-" x 56 . "\n";
+
+    for my $kk (@boolkeys) {
+        $self->displayInfo($kk, $metafuncs{$kk});
+    }
+
+    print $divider;
+
+    for my $kk (@strkeys) {
+        $self->displayInfo($kk, $metafuncs{$kk});
+    }
+
+    print $divider;
+
+    for my $kk (@intkeys) {
+        $self->displayInfo($kk, $metafuncs{$kk});
+    }
+
+    print $divider;
+
+    for my $kk (@resultSetkeys) {
+        $self->displayInfo($kk, $metafuncs{$kk});
+    }
+
+    print $divider;
+
+#printf "yesargkeys=(%s)\n", join(",", @yesargkeys);
+    for my $kk (@yesargkeys) {
+        printf "%-56s %s\n", $kk, $metafuncs{$kk};
+    }
+}
+
+sub displayInfo
+{
+    my ($self, $func, $type) = @_;
+
+    my $dbMetaData = $self->getMetaData();
+    my $call = '$dbMetaData->' . "$func";
+
+    my $val = eval($call);
+    my $valstr = "$val";
+
+    if ($type eq "boolean") {
+        $valstr = ($val ? "true" : "false")
+    } elsif ($type eq "int") {
+        ;
+    } elsif ($type eq "String") {
+        ;
+    } elsif ($type eq "ResultSet") {
+        # dump the result:
+        printf "\n%s:\n", $func;
+        $self->displayResultSet($val);
+        return;
+    } elsif ($type eq "Connection") {
+        ;
+    } else {
+        ;
+    }
+
+    printf "%-56s %s\n", $func, $valstr;
+}
 
 #########
 #accessor methods for {=PL_PACKAGE=} object attributes:
@@ -437,3 +611,60 @@ EOF
 %evalmacro PL_PKG_METHODS PL_PKG_METHODS
 }
 
+{
+old_info = << EOF
+    printf <<"!",
+%-34s %s
+%-34s %s
+%-34s %s
+!
+        "Driver", $self->jdbcDriver(),
+        "URL", $self->jdbcUrl(),
+        "USER", $self->user(),
+        ;
+
+    if (!defined($dbMetaData)) {
+        print "Not connected to database!\n";
+        return;
+    }
+
+    #display some metadata:
+    printf <<"!",
+%-34s %s
+%-34s %s
+%-34s %s
+%-34s %s
+%-34s %s
+%-34s %s
+%-34s %s
+%-34s %s
+%-34s %s
+%-34s %s
+%-34s %s
+%-34s %s
+%-34s %s
+%-34s %s
+%-34s %s
+%-34s %s
+%-34s %s
+!
+    "Database Product",                $dbMetaData->getDatabaseProductName(),
+    "Database Version",                $dbMetaData->getDatabaseProductVersion(),
+    "JDBC Driver",                     $dbMetaData->getDriverVersion(),
+    "DB URL",                          $dbMetaData->getURL(),
+    "Maximum Open Statements",         $dbMetaData->getMaxStatements(),
+    "Maximum Open Connections",        $dbMetaData->getMaxConnections(),
+    "Maximum Procedure Name Length",   $dbMetaData->getMaxProcedureNameLength(),
+    "Maximum Schema Name Length",      $dbMetaData->getMaxSchemaNameLength(),
+    "Maximum Statement Length",        $dbMetaData->getMaxStatementLength(),
+    "Maximum Table Name Length",       $dbMetaData->getMaxTableNameLength(),
+    "Maximum User Name Length",        $dbMetaData->getMaxUserNameLength(),
+    "Maximum Cursor Name Length",      $dbMetaData->getMaxCursorNameLength(),
+    "Is a Read Only Database",         $dbMetaData->isReadOnly() ? "TRUE" : "FALSE",
+    "Connected User Name",             $dbMetaData->getUserName(),
+    "Supports Non-Null Columns",       $dbMetaData->supportsNonNullableColumns() ? "TRUE" : "FALSE",
+    "Uses Local Files",                $dbMetaData->usesLocalFiles() ? "TRUE" : "FALSE",
+    "Uses Local Files Per Table",      $dbMetaData->usesLocalFilePerTable() ? "TRUE" : "FALSE",
+    ;
+EOF
+}
