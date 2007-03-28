@@ -1,0 +1,61 @@
+#read in DatabaseMetaData.java and see if we can figure out which lines are
+#interface defs
+
+
+theFile = DatabaseMetaData.java
+
+err = $theFile:openfile
+#%echo err="$err"
+
+%if    $err %eecho could not open ${theFile}:  $err
+%ifnot $err %eecho opened file $theFile
+
+#we make a copy, because this variable will be undefined at the end of the loop
+infile = $theFile
+
+process_line := << EOF
+#process a single line from the file
+{
+#   %echo $infile line $infile:currentlinenumber=$infile:currentline
+    theline = $infile:currentline
+
+    #ignore comments
+    CG_MATCH_SPEC = /^\s*\*/
+    %if $theline:match %return
+
+    CG_MATCH_SPEC = /;\s*$/
+    %ifnot $theline:match %return
+
+    CG_MATCH_SPEC = /\(/
+    %ifnot $theline:match %return
+
+#%echo theline = '$theline'
+
+    %push lineStack $theline:method2rec
+
+#(method attributes, return type, name(parmeters), exceptions thrown) 
+     %shift method_attributes lineStack
+     %shift method_type       lineStack
+     %shift method_sig        lineStack
+     %shift throws            lineStack
+
+#     text = << EOF_MSG
+#method_attributes '$method_attributes'
+#method_type       '$method_type'
+#method_sig        '$method_sig'
+#throws            '$throws'
+#EOF_MSG
+
+    #generate hash init:
+    %echo '$method_sig'  => '$method_type',
+
+#   %echo $text
+}
+EOF
+
+tab =
+tab = $tab:tab
+
+CG_STACK_DELIMITER = $tab
+
+%whiledef $infile:getnextline %call process_line
