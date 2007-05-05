@@ -1,0 +1,231 @@
+psql> allProceduresAreCallable()                               false
+allTablesAreSelectable()                                 false
+dataDefinitionCausesTransactionCommit()                  true
+dataDefinitionIgnoredInTransactions()                    false
+doesMaxRowSizeIncludeBlobs()                             true
+isCatalogAtStart()                                       true
+isReadOnly()                                             false
+locatorsUpdateCopy()                                     true
+nullPlusNonNullIsNull()                                  true
+nullsAreSortedAtEnd()                                    false
+nullsAreSortedAtStart()                                  false
+nullsAreSortedHigh()                                     false
+nullsAreSortedLow()                                      true
+storesLowerCaseIdentifiers()                             false
+storesLowerCaseQuotedIdentifiers()                       false
+storesMixedCaseIdentifiers()                             true
+storesMixedCaseQuotedIdentifiers()                       true
+storesUpperCaseIdentifiers()                             false
+storesUpperCaseQuotedIdentifiers()                       true
+supportsANSI92EntryLevelSQL()                            true
+supportsANSI92FullSQL()                                  false
+supportsANSI92IntermediateSQL()                          false
+supportsAlterTableWithAddColumn()                        true
+supportsAlterTableWithDropColumn()                       true
+supportsBatchUpdates()                                   true
+supportsCatalogsInDataManipulation()                     true
+supportsCatalogsInIndexDefinitions()                     true
+supportsCatalogsInPrivilegeDefinitions()                 true
+supportsCatalogsInProcedureCalls()                       true
+supportsCatalogsInTableDefinitions()                     true
+supportsColumnAliasing()                                 true
+supportsConvert()                                        false
+supportsCoreSQLGrammar()                                 true
+supportsCorrelatedSubqueries()                           true
+supportsDataDefinitionAndDataManipulationTransactions()  false
+supportsDataManipulationTransactionsOnly()               false
+supportsDifferentTableCorrelationNames()                 true
+supportsExpressionsInOrderBy()                           true
+supportsExtendedSQLGrammar()                             false
+supportsFullOuterJoins()                                 false
+supportsGetGeneratedKeys()                               true
+supportsGroupBy()                                        true
+supportsGroupByBeyondSelect()                            true
+supportsGroupByUnrelated()                               true
+supportsIntegrityEnhancementFacility()                   false
+supportsLikeEscapeClause()                               true
+supportsLimitedOuterJoins()                              true
+supportsMinimumSQLGrammar()                              true
+supportsMixedCaseIdentifiers()                           true
+supportsMixedCaseQuotedIdentifiers()                     true
+supportsMultipleOpenResults()                            true
+supportsMultipleResultSets()                             false
+supportsMultipleTransactions()                           true
+supportsNamedParameters()                                false
+supportsNonNullableColumns()                             true
+supportsOpenCursorsAcrossCommit()                        false
+supportsOpenCursorsAcrossRollback()                      false
+supportsOpenStatementsAcrossCommit()                     false
+supportsOpenStatementsAcrossRollback()                   false
+supportsOrderByUnrelated()                               false
+supportsOuterJoins()                                     true
+supportsPositionedDelete()                               false
+supportsPositionedUpdate()                               false
+supportsSavepoints()                                     true
+supportsSchemasInDataManipulation()                      false
+supportsSchemasInIndexDefinitions()                      false
+supportsSchemasInPrivilegeDefinitions()                  false
+supportsSchemasInProcedureCalls()                        false
+supportsSchemasInTableDefinitions()                      false
+supportsSelectForUpdate()                                true
+supportsStatementPooling()                               false
+supportsStoredProcedures()                               true
+supportsSubqueriesInComparisons()                        true
+supportsSubqueriesInExists()                             true
+supportsSubqueriesInIns()                                true
+supportsSubqueriesInQuantifieds()                        true
+supportsTableCorrelationNames()                          true
+supportsTransactions()                                   true
+supportsUnion()                                          true
+supportsUnionAll()                                       true
+usesLocalFilePerTable()                                  false
+usesLocalFiles()                                         false
+--------------------------------------------------------
+getCatalogSeparator()                                    .
+getCatalogTerm()                                         database
+getDatabaseProductName()                                 MySQL
+getDatabaseProductVersion()                              5.0.27-max
+getDriverName()                                          MySQL-AB JDBC Driver
+getDriverVersion()                                       mysql-connector-java-5.0.4 ( $Date$, $Revision$ )
+getExtraNameCharacters()                                 #@
+getIdentifierQuoteString()                               `
+getNumericFunctions()                                    ABS,ACOS,ASIN,ATAN,ATAN2,BIT_COUNT,CEILING,COS,COT,DEGREES,EXP,FLOOR,LOG,LOG10,MAX,MIN,MOD,PI,POW,POWER,RADIANS,RAND,ROUND,SIN,SQRT,TAN,TRUNCATE
+getProcedureTerm()                                       PROCEDURE
+getSQLKeywords()                                         AUTO_INCREMENT,BINARY,BLOB,ENUM,INFILE,LOAD,MEDIUMINT,OPTION,OUTFILE,REPLACE,SET,TEXT,UNSIGNED,ZEROFILL
+getSchemaTerm()                                          
+getSearchStringEscape()                                  \
+getStringFunctions()                                     ASCII,BIN,BIT_LENGTH,CHAR,CHARACTER_LENGTH,CHAR_LENGTH,CONCAT,CONCAT_WS,CONV,ELT,EXPORT_SET,FIELD,FIND_IN_SET,HEX,INSERT,INSTR,LCASE,LEFT,LENGTH,LOAD_FILE,LOCATE,LOCATE,LOWER,LPAD,LTRIM,MAKE_SET,MATCH,MID,OCT,OCTET_LENGTH,ORD,POSITION,QUOTE,REPEAT,REPLACE,REVERSE,RIGHT,RPAD,RTRIM,SOUNDEX,SPACE,STRCMP,SUBSTRING,SUBSTRING,SUBSTRING,SUBSTRING,SUBSTRING_INDEX,TRIM,UCASE,UPPER
+getSystemFunctions()                                     DATABASE,USER,SYSTEM_USER,SESSION_USER,PASSWORD,ENCRYPT,LAST_INSERT_ID,VERSION
+getTimeDateFunctions()                                   DAYOFWEEK,WEEKDAY,DAYOFMONTH,DAYOFYEAR,MONTH,DAYNAME,MONTHNAME,QUARTER,WEEK,YEAR,HOUR,MINUTE,SECOND,PERIOD_ADD,PERIOD_DIFF,TO_DAYS,FROM_DAYS,DATE_FORMAT,TIME_FORMAT,CURDATE,CURRENT_DATE,CURTIME,CURRENT_TIME,NOW,SYSDATE,CURRENT_TIMESTAMP,UNIX_TIMESTAMP,FROM_UNIXTIME,SEC_TO_TIME,TIME_TO_SEC
+getURL()                                                 jdbc:mysql://mojave:3306/inftest
+getUserName()                                            inf@rtitanium
+--------------------------------------------------------
+getDatabaseMajorVersion()                                5
+getDatabaseMinorVersion()                                0
+getDefaultTransactionIsolation()                         2
+getDriverMajorVersion()                                  5
+getDriverMinorVersion()                                  0
+getJDBCMajorVersion()                                    3
+getJDBCMinorVersion()                                    0
+getMaxBinaryLiteralLength()                              16777208
+getMaxCatalogNameLength()                                32
+getMaxCharLiteralLength()                                16777208
+getMaxColumnNameLength()                                 64
+getMaxColumnsInGroupBy()                                 64
+getMaxColumnsInIndex()                                   16
+getMaxColumnsInOrderBy()                                 64
+getMaxColumnsInSelect()                                  256
+getMaxColumnsInTable()                                   512
+getMaxConnections()                                      0
+getMaxCursorNameLength()                                 64
+getMaxIndexLength()                                      256
+getMaxProcedureNameLength()                              0
+getMaxRowSize()                                          2147483639
+getMaxSchemaNameLength()                                 0
+getMaxStatementLength()                                  65531
+getMaxStatements()                                       0
+getMaxTableNameLength()                                  64
+getMaxTablesInSelect()                                   256
+getMaxUserNameLength()                                   16
+getResultSetHoldability()                                1
+getSQLStateType()                                        2
+--------------------------------------------------------
+
+getCatalogs():
++------------------+
+|TABLE_CAT         |
++------------------+
+|information_schema|
+|inf               |
+|inftest           |
+|mysql             |
+|test              |
++------------------+
+
+getSchemas():
++-----------+
+|TABLE_SCHEM|
++-----------+
++-----------+
+
+getTableTypes():
++---------------+
+|TABLE_TYPE     |
++---------------+
+|TABLE          |
+|VIEW           |
+|LOCAL TEMPORARY|
++---------------+
+
+getTypeInfo():
++--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+|TYPE_NAME       |DATA_TYPE|PRECISION |LITERAL_PREFIX|LITERAL_SUFFIX|CREATE_PARAMS              |NULLABLE|CASE_SENSITIVE|SEARCHABLE|UNSIGNED_ATTRIBUTE|FIXED_PREC_SCALE|AUTO_INCREMENT|LOCAL_TYPE_NAME |MINIMUM_SCALE|MAXIMUM_SCALE|SQL_DATA_TYPE|SQL_DATETIME_SUB|NUM_PREC_RADIX|
++--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+|BIT             |-7       |1         |              |              |                           |1       |true          |3         |false             |false           |false         |BIT             |0            |0            |0            |0               |10            |
+|BOOL            |-7       |1         |              |              |                           |1       |true          |3         |false             |false           |false         |BOOL            |0            |0            |0            |0               |10            |
+|TINYINT         |-6       |3         |              |              |[(M)] [UNSIGNED] [ZEROFILL]|1       |false         |3         |true              |false           |true          |TINYINT         |0            |0            |0            |0               |10            |
+|BIGINT          |-5       |19        |              |              |[(M)] [UNSIGNED] [ZEROFILL]|1       |false         |3         |true              |false           |true          |BIGINT          |0            |0            |0            |0               |10            |
+|LONG VARBINARY  |-4       |16777215  |'             |'             |                           |1       |true          |3         |false             |false           |false         |LONG VARBINARY  |0            |0            |0            |0               |10            |
+|MEDIUMBLOB      |-4       |16777215  |'             |'             |                           |1       |true          |3         |false             |false           |false         |MEDIUMBLOB      |0            |0            |0            |0               |10            |
+|LONGBLOB        |-4       |2147483647|'             |'             |                           |1       |true          |3         |false             |false           |false         |LONGBLOB        |0            |0            |0            |0               |10            |
+|BLOB            |-4       |65535     |'             |'             |                           |1       |true          |3         |false             |false           |false         |BLOB            |0            |0            |0            |0               |10            |
+|TINYBLOB        |-4       |255       |'             |'             |                           |1       |true          |3         |false             |false           |false         |TINYBLOB        |0            |0            |0            |0               |10            |
+|VARBINARY       |-3       |255       |'             |'             |(M)                        |1       |true          |3         |false             |false           |false         |VARBINARY       |0            |0            |0            |0               |10            |
+|BINARY          |-2       |255       |'             |'             |(M)                        |1       |true          |3         |false             |false           |false         |BINARY          |0            |0            |0            |0               |10            |
+|LONG VARCHAR    |-1       |16777215  |'             |'             |                           |1       |false         |3         |false             |false           |false         |LONG VARCHAR    |0            |0            |0            |0               |10            |
+|MEDIUMTEXT      |-1       |16777215  |'             |'             |                           |1       |false         |3         |false             |false           |false         |MEDIUMTEXT      |0            |0            |0            |0               |10            |
+|LONGTEXT        |-1       |2147483647|'             |'             |                           |1       |false         |3         |false             |false           |false         |LONGTEXT        |0            |0            |0            |0               |10            |
+|TEXT            |-1       |65535     |'             |'             |                           |1       |false         |3         |false             |false           |false         |TEXT            |0            |0            |0            |0               |10            |
+|TINYTEXT        |-1       |255       |'             |'             |                           |1       |false         |3         |false             |false           |false         |TINYTEXT        |0            |0            |0            |0               |10            |
+|CHAR            |1        |255       |'             |'             |(M)                        |1       |false         |3         |false             |false           |false         |CHAR            |0            |0            |0            |0               |10            |
+|NUMERIC         |2        |17        |              |              |[(M[,D])] [ZEROFILL]       |1       |false         |3         |false             |false           |true          |NUMERIC         |-308         |308          |0            |0               |10            |
+|DECIMAL         |3        |17        |              |              |[(M[,D])] [ZEROFILL]       |1       |false         |3         |false             |false           |true          |DECIMAL         |-308         |308          |0            |0               |10            |
+|INTEGER         |4        |10        |              |              |[(M)] [UNSIGNED] [ZEROFILL]|1       |false         |3         |true              |false           |true          |INTEGER         |0            |0            |0            |0               |10            |
+|INT             |4        |10        |              |              |[(M)] [UNSIGNED] [ZEROFILL]|1       |false         |3         |true              |false           |true          |INT             |0            |0            |0            |0               |10            |
+|MEDIUMINT       |4        |7         |              |              |[(M)] [UNSIGNED] [ZEROFILL]|1       |false         |3         |true              |false           |true          |MEDIUMINT       |0            |0            |0            |0               |10            |
+|SMALLINT        |5        |5         |              |              |[(M)] [UNSIGNED] [ZEROFILL]|1       |false         |3         |true              |false           |true          |SMALLINT        |0            |0            |0            |0               |10            |
+|FLOAT           |7        |10        |              |              |[(M,D)] [ZEROFILL]         |1       |false         |3         |false             |false           |true          |FLOAT           |-38          |38           |0            |0               |10            |
+|DOUBLE          |8        |17        |              |              |[(M,D)] [ZEROFILL]         |1       |false         |3         |false             |false           |true          |DOUBLE          |-308         |308          |0            |0               |10            |
+|DOUBLE PRECISION|8        |17        |              |              |[(M,D)] [ZEROFILL]         |1       |false         |3         |false             |false           |true          |DOUBLE PRECISION|-308         |308          |0            |0               |10            |
+|REAL            |8        |17        |              |              |[(M,D)] [ZEROFILL]         |1       |false         |3         |false             |false           |true          |REAL            |-308         |308          |0            |0               |10            |
+|VARCHAR         |12       |255       |'             |'             |(M)                        |1       |false         |3         |false             |false           |false         |VARCHAR         |0            |0            |0            |0               |10            |
+|ENUM            |12       |65535     |'             |'             |                           |1       |false         |3         |false             |false           |false         |ENUM            |0            |0            |0            |0               |10            |
+|SET             |12       |64        |'             |'             |                           |1       |false         |3         |false             |false           |false         |SET             |0            |0            |0            |0               |10            |
+|DATE            |91       |0         |'             |'             |                           |1       |false         |3         |false             |false           |false         |DATE            |0            |0            |0            |0               |10            |
+|TIME            |92       |0         |'             |'             |                           |1       |false         |3         |false             |false           |false         |TIME            |0            |0            |0            |0               |10            |
+|DATETIME        |93       |0         |'             |'             |                           |1       |false         |3         |false             |false           |false         |DATETIME        |0            |0            |0            |0               |10            |
+|TIMESTAMP       |93       |0         |'             |'             |[(M)]                      |1       |false         |3         |false             |false           |false         |TIMESTAMP       |0            |0            |0            |0               |10            |
++--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+--------------------------------------------------------
+deletesAreDetected(int type)                             boolean
+getAttributes(String catalog, String schemaPattern, String typeNamePattern, String attributeNamePattern) ResultSet
+getBestRowIdentifier(String catalog, String schema, String table, int scope, boolean nullable) ResultSet
+getColumnPrivileges(String catalog, String schema, String table, String columnNamePattern) ResultSet
+getColumns(String catalog, String schemaPattern, String tableNamePattern, String columnNamePattern) ResultSet
+getCrossReference( String primaryCatalog, String primarySchema, String primaryTable, String foreignCatalog, String foreignSchema, String foreignTable) ResultSet
+getExportedKeys(String catalog, String schema, String table) ResultSet
+getImportedKeys(String catalog, String schema, String table) ResultSet
+getIndexInfo(String catalog, String schema, String table, boolean unique, boolean approximate) ResultSet
+getPrimaryKeys(String catalog, String schema, String table) ResultSet
+getProcedureColumns(String catalog, String schemaPattern, String procedureNamePattern, String columnNamePattern) ResultSet
+getProcedures(String catalog, String schemaPattern, String procedureNamePattern) ResultSet
+getSuperTables(String catalog, String schemaPattern, String tableNamePattern) ResultSet
+getSuperTypes(String catalog, String schemaPattern, String typeNamePattern) ResultSet
+getTablePrivileges(String catalog, String schemaPattern, String tableNamePattern) ResultSet
+getTables(String catalog, String schemaPattern, String tableNamePattern, String types[]) ResultSet
+getUDTs(String catalog, String schemaPattern, String typeNamePattern, int[] types) ResultSet
+getVersionColumns(String catalog, String schema, String table) ResultSet
+insertsAreDetected(int type)                             boolean
+othersDeletesAreVisible(int type)                        boolean
+othersInsertsAreVisible(int type)                        boolean
+othersUpdatesAreVisible(int type)                        boolean
+ownDeletesAreVisible(int type)                           boolean
+ownInsertsAreVisible(int type)                           boolean
+ownUpdatesAreVisible(int type)                           boolean
+supportsConvert(int fromType, int toType)                boolean
+supportsResultSetConcurrency(int type, int concurrency)  boolean
+supportsResultSetHoldability(int holdability)            boolean
+supportsResultSetType(int type)                          boolean
+supportsTransactionIsolationLevel(int level)             boolean
+updatesAreDetected(int type)                             boolean
+psql> 

@@ -1,0 +1,6 @@
+select DATE_FORMAT(CURDATE());
+select FROM_DAYS(CURDATE());
+select PERIOD_ADD(CURDATE());
+select PERIOD_DIFF(CURDATE());
+select SEC_TO_TIME(CURDATE());
+select TIME_FORMAT(CURDATE());

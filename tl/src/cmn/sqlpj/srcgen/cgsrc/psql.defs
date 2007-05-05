@@ -11,8 +11,8 @@ use $PSQLIMPL_PACKAGE;
 EOF
 
 PL_PKG_ATTRIBUTES := << EOF
-my $JDBC_URL      = "{=MOJAVE_INF_URL=}";
 my $DRIVER_CLASS  = "{=MYSQLDRV=}";
+my $JDBC_URL      = "{=MOJAVE_INF_URL=}";
 my $USER          = "{=MOJAVE_INF_USER=}";
 my $PASSWORD      = "{=MOJAVE_INF_PASSWD=}";
 my $USE_STDIN = 1;
@@ -25,29 +25,35 @@ EOF
 {
 PL_MAIN := << EOF
 # Generic jdbc script runner.
+
+$JDBC_URL      = "{=OJCBUILDS_URL=}";
+$JDBC_URL      = "{=MOJAVE_AK_URL=}";
+$USER          = "{=MOJAVE_AK_USER=}";
+$PASSWORD      = "{=MOJAVE_AK_PASSWD=}";
+
 my $psqlImpl = new {=PSQLIMPL_PACKAGE=} ($JDBC_URL, $DRIVER_CLASS, $USER, $PASSWORD, $PROMPT);
 
 #initialize our driver class:
 if (!$psqlImpl->check_driver()) {
-	printf STDERR "%s:  ERROR: JDBC driver '%s' is not available for url '%s', user '%s', password '%s'\n",
-		$pkgname, $psqlImpl->jdbcDriver(), $psqlImpl->jdbcUrl(), $psqlImpl->user(), $psqlImpl->password();
-	return 1;
+    printf STDERR "%s:  ERROR: JDBC driver '%s' is not available for url '%s', user '%s', password '%s'\n",
+        $pkgname, $psqlImpl->jdbcDriver(), $psqlImpl->jdbcUrl(), $psqlImpl->user(), $psqlImpl->password();
+    return 1;
 }
 
 if ($USE_STDIN) {
-	printf STDERR "%s:  using stdin\n", $pkgname;
-	my $stdinh = "STDIN";
-	$psqlImpl->sqlsession($stdinh, "<STDIN>");
+    printf STDERR "%s:  using stdin\n", $pkgname;
+    my $stdinh = "STDIN";
+    $psqlImpl->sqlsession($stdinh, "<STDIN>");
 } else {
-	my $infile;
-	for (my $ii = 0; $ii <= $#SQLFILES; $ii++) {
-		if (open($infile, $SQLFILES[$ii])) {
-			$psqlImpl->sqlsession(\$infile, $SQLFILES[$ii]);
-			close $infile;
-		} else {
-			printf STDERR "%s:  ERROR: cannot open sql input, '%s':  '%s'\n", $pkgname, $SQLFILES[$ii], $!;
-		}
-	}
+    my $infile;
+    for (my $ii = 0; $ii <= $#SQLFILES; $ii++) {
+        if (open($infile, $SQLFILES[$ii])) {
+            $psqlImpl->sqlsession(\$infile, $SQLFILES[$ii]);
+            close $infile;
+        } else {
+            printf STDERR "%s:  ERROR: cannot open sql input, '%s':  '%s'\n", $pkgname, $SQLFILES[$ii], $!;
+        }
+    }
 }
 
 return 0;
@@ -78,7 +84,7 @@ EOF
 
 {
 PL_USAGE := << EOF
-Usage:  $p [options] [file ...]
+Usage:  $pkgname [options] [file ...]
 
 SYNOPSIS
   Creates a new database connection and runs each
@@ -106,7 +112,7 @@ ENVIRONMENT
  CLASSPATH      you must have the database jdbc driver in your classpath
 
 EXAMPLE
-  $p -url jdbc:oracle:thin:\@pipit.sfbay.sun.com:1521:FORTE \\
+  $pkgname -url jdbc:oracle:thin:\@pipit.sfbay.sun.com:1521:FORTE \\
      -driver oracle.jdbc.driver.OracleDriver -user system -password manager foo.sql
 EOF
 

@@ -464,6 +464,9 @@ sub localCommand
     } elsif ($buf  =~ /^tables/i) {
         $buf =~ s/tables\s*//i;
         $self->tablesCommand($buf);
+    } elsif ($buf  =~ /^table/i) {
+        $buf =~ s/table\s*//i;
+        $self->tableCommand($buf);
     } else {
         return 0;    #not a local command
     }
@@ -477,10 +480,58 @@ sub helpCommand
 
     print <<"!";
 Local commands are:
- help          - show this message
- info          - show database meta information
- tables [db]   - show information about tables in <db>, defaultinf to connection db.
+ help             - show this message
+ info             - show database meta information
+ tables [db]      - show information about tables in <db>, defaults to connection db.
+ tables name [db] - show information about table <name> in <db>, defaults to connection db.
 !
+}
+
+sub tableCommand
+#implement the table command, which shows information about a single table
+#Usage:  table table_name
+{
+    my ($self, $args) = @_;
+
+    my ($tblname, $dbname) = split(/\s+/, $args);
+
+    my $dbMetaData = $self->getMetaData();
+
+    my $rseta = undef;
+    my $rsetb = undef;
+
+    my $rseta_stmt = undef;
+    my $rsetb_stmt = undef;
+
+#'getColumns(String catalog, String schemaPattern, String tableNamePattern, String columnNamePattern)'  => 'ResultSet',
+#'getPrimaryKeys(String catalog, String schema, String table)'  => 'ResultSet',
+
+#printf STDERR "tblname='%s' dbname='%s'\n", $tblname, $dbname;
+
+    eval {
+        $rseta = $dbMetaData->getColumns($dbname, "%", $tblname, "%");
+        $rseta_stmt =  $rseta->getStatement();
+        printf "STATEMENT FOR getColumns() resultSet='%s'\n", defined($rseta_stmt)? "defined" : "undefined";
+        $rseta_stmt =  $rseta->getType();
+        printf "TYPE FOR getColumns() resultSet='%s'\n", defined($rseta_stmt)? $rseta_stmt : "undefined" ;
+
+        $rsetb = $dbMetaData->getPrimaryKeys($dbname, "%", $tblname);
+        #$rsetb_stmt =  $rsetb->getStatement();
+        #printf "STATEMENT FOR getPrimaryKeys()='%s'\n", $rsetb_stmt->toString();
+    };
+
+    if ($@) {
+        if (caught("java.sql.SQLException")){
+            my $msg = $@->getMessage() ;
+            printf STDERR "%s[tablesCommand]:  Java exception: '%s'\n", $pkgname, $msg;
+        } else {
+            printf STDERR "%s[tablesCommand]:  ERROR: '%s'\n",$pkgname, $@;
+        }
+        return;
+    }
+
+    $self->displayResultSet($rseta);
+    $self->displayResultSet($rsetb);
 }
 
 sub tablesCommand
@@ -500,11 +551,8 @@ sub tablesCommand
     #$dbname = undef;
     eval {
         $rseta = $dbMetaData->getTables($dbname, "%", "%", []);
-        $rsetb = $dbMetaData->getSuperTables($dbname, "%", "%");
-        $rsetc = $dbMetaData->getSuperTypes($dbname, "%", "%");
-        #$rseta = $dbMetaData->getTables("null", "", "", "");
-        #$rsetb = $dbMetaData->getTables("inftest", "", "cvs2inf_error_defs", undef);
-        #$rsetc = $dbMetaData->getTables("inftest", "*", "cvs2inf_error_defs", undef);
+        #$rsetb = $dbMetaData->getSuperTables($dbname, "%", "%");
+        #$rsetc = $dbMetaData->getSuperTypes($dbname, "%", "%");
     };
 
     if ($@) {
@@ -518,8 +566,8 @@ sub tablesCommand
     }
 
     $self->displayResultSet($rseta);
-    $self->displayResultSet($rsetb);
-    $self->displayResultSet($rsetc);
+    #$self->displayResultSet($rsetb);
+    #$self->displayResultSet($rsetc);
 }
 
 sub infoCommand
@@ -609,62 +657,4 @@ sub displayInfo
 EOF
 
 %evalmacro PL_PKG_METHODS PL_PKG_METHODS
-}
-
-{
-old_info = << EOF
-    printf <<"!",
-%-34s %s
-%-34s %s
-%-34s %s
-!
-        "Driver", $self->jdbcDriver(),
-        "URL", $self->jdbcUrl(),
-        "USER", $self->user(),
-        ;
-
-    if (!defined($dbMetaData)) {
-        print "Not connected to database!\n";
-        return;
-    }
-
-    #display some metadata:
-    printf <<"!",
-%-34s %s
-%-34s %s
-%-34s %s
-%-34s %s
-%-34s %s
-%-34s %s
-%-34s %s
-%-34s %s
-%-34s %s
-%-34s %s
-%-34s %s
-%-34s %s
-%-34s %s
-%-34s %s
-%-34s %s
-%-34s %s
-%-34s %s
-!
-    "Database Product",                $dbMetaData->getDatabaseProductName(),
-    "Database Version",                $dbMetaData->getDatabaseProductVersion(),
-    "JDBC Driver",                     $dbMetaData->getDriverVersion(),
-    "DB URL",                          $dbMetaData->getURL(),
-    "Maximum Open Statements",         $dbMetaData->getMaxStatements(),
-    "Maximum Open Connections",        $dbMetaData->getMaxConnections(),
-    "Maximum Procedure Name Length",   $dbMetaData->getMaxProcedureNameLength(),
-    "Maximum Schema Name Length",      $dbMetaData->getMaxSchemaNameLength(),
-    "Maximum Statement Length",        $dbMetaData->getMaxStatementLength(),
-    "Maximum Table Name Length",       $dbMetaData->getMaxTableNameLength(),
-    "Maximum User Name Length",        $dbMetaData->getMaxUserNameLength(),
-    "Maximum Cursor Name Length",      $dbMetaData->getMaxCursorNameLength(),
-    "Is a Read Only Database",         $dbMetaData->isReadOnly() ? "TRUE" : "FALSE",
-    "Connected User Name",             $dbMetaData->getUserName(),
-    "Supports Non-Null Columns",       $dbMetaData->supportsNonNullableColumns() ? "TRUE" : "FALSE",
-    "Uses Local Files",                $dbMetaData->usesLocalFiles() ? "TRUE" : "FALSE",
-    "Uses Local Files Per Table",      $dbMetaData->usesLocalFilePerTable() ? "TRUE" : "FALSE",
-    ;
-EOF
 }

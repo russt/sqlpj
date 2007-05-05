@@ -1,14 +1,14 @@
 %include build_setup.defs
 
 {
-    #this is the main server for cvs commit processing
+    #this is sqlpj implementation:
     PL_PACKAGE = psqlImpl
     %include $PL_PACKAGE.defs
     perl/prlobj.ptpl                 /$PL_PACKAGE.pm
 }
 
 {
-    #this is the main server for cvs commit processing
+    #main program:
     PL_PACKAGE = psql
     %include $PL_PACKAGE.defs
     perl/prlskel.ptpl                 /$PL_PACKAGE.pl

@@ -1,0 +1,151 @@
+Library::Perl::5.8.6::User(Contributed Perl DocumLibrary::Perl::5.8.6::JDBC(3)
+
+
+
+NAME
+       JDBC - Perl 5 interface to Java JDBC (via Inline::Java)
+
+VERSION
+       Version 0.01
+
+SYNOPSIS
+           use JDBC;
+
+           JDBC->load_driver("org.apache.derby.jdbc.EmbeddedDriver");
+
+           my $con = JDBC->getConnection($url, "test", "test");
+
+           my $s = $con->createStatement();
+
+           $s->executeUpdate("create table foo (foo int, bar varchar(200), primary key (foo))");
+           $s->executeUpdate("insert into foo (foo, bar) values (42,'notthis')");
+           $s->executeUpdate("insert into foo (foo, bar) values (43,'notthat')");
+
+           my $rs = $s->executeQuery("select foo, bar from foo");
+           while ($rs->next) {
+               my $foo = $rs->getInt(1);
+               my $bar = $rs->getString(2);
+               print "row: foo=$foo, bar=$bar\n";
+           }
+
+DESCRIPTION
+       This JDBC module provides an interface to the Java "java.sql.*" and
+       "javax.sql.*" JDBC APIs.
+
+METHODS
+       load_driver
+
+       The load_driver() method is used to load a driver class.
+
+         JDBC->load_driver($driver_class)
+
+       is equivalent to the Java:
+
+         java.lang.Class.forName(driver_class).newInstance();
+
+FUNCTIONS
+       cast
+
+
+       caught
+
+
+       study_classes
+
+       The cast(), caught(), and study_classes() functions of Inline::Java are
+       also optionally exported by the JDBC module.
+
+IMPORTING CONSTANTS
+       Java JDBC makes use of constants defined in
+
+         import java.sql.*;
+         ...
+         stmt = con.prepareStatement(PreparedStatement.SELECT);
+
+       the package can also be specified with the "import" which then avoids
+       the need to prefix the constant with the class:
+
+         import java.sql.PreparedStatement;
+         ...
+         stmt = con.prepareStatement(SELECT);
+
+       In Perl the corresponding code can be either:
+
+         use JDBC;
+         ...
+         $stmt = $con->prepareStatement($java::sql::PrepareStatement::SELECT);
+
+       or, the rather more friendly:
+
+         use JDBC qw(:PreparedStatement);
+         ...
+         $stmt = $con->prepareStatement(SELECT);
+
+       When importing a JDBC class in this way the JDBC module only imports
+       defined scalars with all-uppercase names, and it turns them into perl
+       constants so the "$" is no longer needed.
+
+       All constants in all the java.sql and javax.sql classes can be imported
+       in this way.
+
+WHY
+       Why did I create this module?
+
+       Because it will help the design of DBI v2.
+
+       How will it help the design of DBI v2?
+
+       Well, "the plan" is to clearly separate the driver interface from the
+       Perl DBI.  The driver interface will be defined at the Parrot level and
+       so, it's hoped, that a single set of drivers can be shared by all lan-
+       guages targeting Parrot.
+
+       Each language would then have their own thin 'adaptor' layered over the
+       Parrot drivers. For Perl that'll be the Perl DBIv2.
+
+       So before getting very far designing DBI v2 there's a need to design
+       the underlying driver interface. Java JDBC can serve as a useful role
+       model.  (Many of the annoyances of Java JDBC and actually annoyances of
+       Java and so cease to be relevant for Parrot.)
+
+       As part of the DBI v2 work I'll probably write a "PDBC" module as a
+       layer over this JDBC module. Then DBI v2 will target the PDBC module
+       and the PDBC module will capture the differences between plain JDBC API
+       and the Parrot driver API.
+
+SEE ALSO
+       Inline::Java
+
+AUTHOR
+       Tim Bunce, "<Tim.Bunce@pobox.com>"
+
+BUGS
+       Firstly try to determine if the problem is related to the JDBC module
+       itself or, more likely, the underlying Inline::Java module.
+
+       Please report any bugs or feature requests for JDBC to
+       "bug-jdbc@rt.cpan.org", or through the web interface at
+       <http://rt.cpan.org/NoAuth/ReportBug.html?Queue=JDBC>.  I will be noti-
+       fied, and then you'll automatically be notified of progress on your bug
+       as I make changes.
+
+       Please report any bugs or feature requests for Inline::Java to the
+       Inline::Java mailing list.
+
+       "Inline::Java"'s mailing list is <inline@perl.org>.  To subscribe, send
+       an email to <inline-subscribe@perl.org>
+
+       "Inline::Java"'s home page is http://inline.perl.org/java/
+
+ACKNOWLEDGEMENTS
+       Thanks to Patrick LeBoutillier for creating Inline::Java.
+
+COPYRIGHT & LICENSE
+       Copyright 2005 Tim Bunce, all rights reserved.
+
+       This program is free software; you can redistribute it and/or modify it
+       under the same terms as Perl itself.
+
+
+
+perl v5.8.6                       2007-03-25     Library::Perl::5.8.6::JDBC(3)

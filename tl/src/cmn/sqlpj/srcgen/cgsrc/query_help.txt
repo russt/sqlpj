@@ -1,0 +1,35 @@
+psql> select database();
++----------+
+|database()|
++----------+
+|mysql     |
++----------+
+psql> select database();
++----------+
+|database()|
++----------+
+|mysql     |
++----------+
+psql> use inf;
+update count=0
+psql> select database();
++----------+
+|database()|
++----------+
+|inf       |
++----------+
+
+psql> select CURDATE();
++----------+
+|CURDATE() |
++----------+
+|2007-03-28|
++----------+
+psql> select curtime();
++---------+
+|curtime()|
++---------+
+|10:50:29 |
++---------+
+psql> 
+
