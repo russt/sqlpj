@@ -38,13 +38,18 @@ PL_OBJ_ATTRIBUTES := << EOF
 'mPrompt'      => $prompt,
 'mConnection'  => undef,
 'mMetaData'    => undef,
+'mMetaFuncs'    => undef,
 EOF
 #%evalmacro PL_OBJ_ATTRIBUTES PL_OBJ_ATTRIBUTES
 
 #this is for further initialzation of attributes, since hash init cannot be self-referential:
 PL_POST_ATTRIBUTE_INIT := << EOF
+#read in database meta-function interface definitions:
+%{$self->{'mMetaFuncs'}}      = (
+{=%include dbmeta.defs=}
+);
 EOF
-#%evalmacro PL_POST_ATTRIBUTE_INIT PL_POST_ATTRIBUTE_INIT
+%evalmacro PL_POST_ATTRIBUTE_INIT PL_POST_ATTRIBUTE_INIT
 }
 
 { ## class methods
@@ -57,10 +62,10 @@ PL_ATTRIBUTE_NAME = Connection
 %evalmacro >> getset_methods pl_getset
 PL_ATTRIBUTE_NAME = MetaData
 %evalmacro >> getset_methods pl_getset
+PL_ATTRIBUTE_NAME = JdbcUrl
+%evalmacro >> getset_methods pl_getset
 
 #generate read-only attributes:
-PL_ATTRIBUTE_NAME = JdbcUrl
-%evalmacro >> getset_methods pl_attr_method
 PL_ATTRIBUTE_NAME = JdbcDriver
 %evalmacro >> getset_methods pl_attr_method
 PL_ATTRIBUTE_NAME = User
@@ -68,6 +73,8 @@ PL_ATTRIBUTE_NAME = User
 PL_ATTRIBUTE_NAME = Password
 %evalmacro >> getset_methods pl_attr_method
 PL_ATTRIBUTE_NAME = Prompt
+%evalmacro >> getset_methods pl_attr_method
+PL_ATTRIBUTE_NAME = MetaFuncs
 %evalmacro >> getset_methods pl_attr_method
 
 {
@@ -99,7 +106,7 @@ sub sqlsession
 
     while ($lbuf = <$aFh>)
     {
-        #we implement a few local commands just for fun:
+        #local commands:
         if ($self->localCommand($lbuf)) {
             print $self->prompt();
             next;
@@ -267,7 +274,7 @@ sub sql_init_connection
 
     #try to get a connection:
     eval {
-        $self->setConnection(JDBC->getConnection($self->jdbcUrl(), $self->user(), $self->password()));
+        $self->setConnection(JDBC->getConnection($self->getJdbcUrl(), $self->user(), $self->password()));
         #mConnection = java.sql.DriverManager.getConnection(mURL, mUSER, mPASSWORD);
 
         #also set a handle for DatabaseMetaData:
@@ -458,9 +465,12 @@ sub localCommand
     if ($buf =~ /^help/i) {
         $buf =~ s/help\s*//i;
         $self->helpCommand($buf);
-    } elsif ($buf  =~ /^info/i) {
-        $buf =~ s/info\s*//i;
-        $self->infoCommand($buf);
+    } elsif ($buf  =~ /^use/i) {
+        $buf =~ s/use\s*//i;
+        $self->useCommand($buf);
+    } elsif ($buf  =~ /^show/i) {
+        $buf =~ s/show\s*//i;
+        $self->showCommand($buf);
     } elsif ($buf  =~ /^tables/i) {
         $buf =~ s/tables\s*//i;
         $self->tablesCommand($buf);
@@ -480,10 +490,18 @@ sub helpCommand
 
     print <<"!";
 Local commands are:
- help             - show this message
- info             - show database meta information
- tables [db]      - show information about tables in <db>, defaults to connection db.
- tables name [db] - show information about table <name> in <db>, defaults to connection db.
+ help                - show this message
+
+ tables [db]         - show information about tables in <db>, defaults to connection db.
+ tables name [db]    - show information about table <name> in <db>, defaults to connection db.
+
+ show conn[ection]   - show jdbc connection properties, including product & version
+ show create [table] - generate sql to create all tables, or a single table.
+ show db             - show db name
+ show metadata       - show jdbc metadata (long)
+
+ dump [table] [filename]
+                     - dump all or named table to stdout or <filename>
 !
 }
 
@@ -570,56 +588,156 @@ sub tablesCommand
     #$self->displayResultSet($rsetc);
 }
 
-sub infoCommand
-#implement the info command, which exercises the DatabaseMetaData class.
+sub showCommand
+#show meta-info about the database and/or tables
 {
-    my ($self, $args) = @_;
+    my ($self, $buf) = @_;
 
-    #try if from a hash:
-    my %metafuncs = (
-{=%include dbmeta.defs=}
-    );
+    #trim buf:
+    $buf =~ s/^\s+//;
+    $buf =~ s/[;\s]*$//;
 
-    my (@noargkeys)     = grep($_ =~ /\(\)$/, sort keys %metafuncs);
-    my (@yesargkeys)    = grep($_ !~ /\(\)$/, sort keys %metafuncs);
-    my (@boolkeys)      = grep($metafuncs{$_} eq "boolean", @noargkeys);
-    my (@intkeys)       = grep($metafuncs{$_} eq "int", @noargkeys);
-    my (@strkeys)       = grep($metafuncs{$_} eq "String", @noargkeys);
-    my (@resultSetkeys) = grep($metafuncs{$_} eq "ResultSet", @noargkeys);
+# show conn[ection]   - show jdbc connection properties, including product & version
+# show create [table] - generate sql to create all tables, or a single table.
+# show db             - show db name
+# show metadata       - show jdbc metadata (long)
+    if ($buf =~ /^conn/i) {
+        $buf =~ s/conn.*\s*//i;
+        $self->showConnection($buf);
+    } elsif ($buf  =~ /^create/i) {
+        $buf =~ s/create\s*//i;
+        $self->showCreate($buf);
+    } elsif ($buf  =~ /^db/i) {
+        $buf =~ s/db\s*//i;
+        $self->showDataBase($buf);
+    } elsif ($buf  =~ /^meta/i) {
+        $buf =~ s/meta.*\s*//i;
+        $self->showMetaData($buf);
+    } else {
+        return 0;    #not a local command
+    }
+}
+
+sub showCreate
+#show database name
+{
+    my ($self, $buf) = @_;
+
+    #limit to one table?
+
+    #otherwise, get list of tables and show create for each table:
+
+}
+
+sub showDataBase
+#show database name
+{
+    my ($self, $buf) = @_;
+
+    $self->sql_exec("select DATABASE()");
+}
+
+sub useCommand
+#change the database, get new metadata
+{
+    my ($self, $dbname) = @_;
+
+    if (!defined($dbname) || $dbname eq "") {
+        printf STDERR "%s: use:  you must supply a database name\n", $pkgname;
+        return;
+    }
+
+    #set connection to use new database name:
+
+    my $jdbcurl = $self->getJdbcUrl();
+    $jdbcurl =~ s|/[^/]+$||;
+
+    $self->setJdbcUrl(sprintf("%s/%s", $jdbcurl, $dbname));
+
+printf STDERR "SET DATABASE TO '%s' jdbcurl='%s'\n", $dbname, $self->getJdbcUrl();
+
+    $self->sql_init_connection();
+
+    #get metadata for new database:
+    printf STDERR "GET NEW METADATA\n";
+
+    $self->sql_exec(sprintf("use %s;", $dbname));
+}
+
+sub showConnection
+#show database info
+{
+    my ($self, $buf) = @_;
+    my $func = "";
+
+    my $metafuncs = $self->metaFuncs();
+
+    $func = 'getURL()';
+    $self->callMetaFunc($func, $$metafuncs{$func});
+
+    $func = 'getUserName()';
+    $self->callMetaFunc($func, $$metafuncs{$func});
+
+    $func = 'getDriverName()';
+    $self->callMetaFunc($func, $$metafuncs{$func});
+
+    $func = 'getDriverVersion()';
+    $self->callMetaFunc($func, $$metafuncs{$func});
+
+    $func = 'getDatabaseProductName()';
+    $self->callMetaFunc($func, $$metafuncs{$func});
+
+    $func = 'getDatabaseProductVersion()';
+    $self->callMetaFunc($func, $$metafuncs{$func});
+}
+
+sub showMetaData
+#show meta-info about the database and/or tables
+{
+    my ($self, $buf) = @_;
+
+    my $metafuncs = $self->metaFuncs();
+
+    my (@noargkeys)     = grep($_ =~ /\(\)$/, sort keys %$metafuncs);
+    my (@yesargkeys)    = grep($_ !~ /\(\)$/, sort keys %$metafuncs);
+    my (@boolkeys)      = grep($$metafuncs{$_} eq "boolean", @noargkeys);
+    my (@intkeys)       = grep($$metafuncs{$_} eq "int", @noargkeys);
+    my (@strkeys)       = grep($$metafuncs{$_} eq "String", @noargkeys);
+    my (@resultSetkeys) = grep($$metafuncs{$_} eq "ResultSet", @noargkeys);
 
     my $divider =  "-" x 56 . "\n";
 
     for my $kk (@boolkeys) {
-        $self->displayInfo($kk, $metafuncs{$kk});
+        $self->callMetaFunc($kk, $$metafuncs{$kk});
     }
 
     print $divider;
 
     for my $kk (@strkeys) {
-        $self->displayInfo($kk, $metafuncs{$kk});
+        $self->callMetaFunc($kk, $$metafuncs{$kk});
     }
 
     print $divider;
 
     for my $kk (@intkeys) {
-        $self->displayInfo($kk, $metafuncs{$kk});
+        $self->callMetaFunc($kk, $$metafuncs{$kk});
     }
 
     print $divider;
 
     for my $kk (@resultSetkeys) {
-        $self->displayInfo($kk, $metafuncs{$kk});
+        $self->callMetaFunc($kk, $$metafuncs{$kk});
     }
 
     print $divider;
 
 #printf "yesargkeys=(%s)\n", join(",", @yesargkeys);
     for my $kk (@yesargkeys) {
-        printf "%-56s %s\n", $kk, $metafuncs{$kk};
+        printf "%-56s %s\n", $kk, $$metafuncs{$kk};
     }
 }
 
-sub displayInfo
+sub callMetaFunc
 {
     my ($self, $func, $type) = @_;
 
