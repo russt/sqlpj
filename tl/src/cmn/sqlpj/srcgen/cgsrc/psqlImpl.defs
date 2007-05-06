@@ -39,6 +39,7 @@ PL_OBJ_ATTRIBUTES := << EOF
 'mConnection'  => undef,
 'mMetaData'    => undef,
 'mMetaFuncs'    => undef,
+'mDatabaseName' => undef,
 EOF
 #%evalmacro PL_OBJ_ATTRIBUTES PL_OBJ_ATTRIBUTES
 
@@ -63,6 +64,8 @@ PL_ATTRIBUTE_NAME = Connection
 PL_ATTRIBUTE_NAME = MetaData
 %evalmacro >> getset_methods pl_getset
 PL_ATTRIBUTE_NAME = JdbcUrl
+%evalmacro >> getset_methods pl_getset
+PL_ATTRIBUTE_NAME = DatabaseName
 %evalmacro >> getset_methods pl_getset
 
 #generate read-only attributes:
@@ -268,9 +271,12 @@ sub check_driver
 
 sub sql_init_connection
 # open the jdbc connection.
-# @return true if successful.
+# return true if successful.
 {
     my ($self) = @_;
+
+    #make sure currentl connection is closed:
+    $self->sql_close_connection();
 
     #try to get a connection:
     eval {
@@ -279,6 +285,9 @@ sub sql_init_connection
 
         #also set a handle for DatabaseMetaData:
         $self->setMetaData( $self->getConnection()->getMetaData() );
+
+        #set database name from connection url:
+        $self->setDatabaseName( &getDbnameFromUrl($self->getJdbcUrl()) );
     };
 
     if ($@) {
@@ -290,6 +299,9 @@ sub sql_init_connection
         }
         return 0;
     }
+
+    #set list of table names:
+    #$self->setTableNames( $self->getConnection()->getMetaData() );
 
     return 1;    #success
 }
@@ -377,9 +389,9 @@ sub getColumnSizes
     if ($@) {
         if (caught("java.sql.SQLException")){
             my $msg = $@->getMessage() ;
-            printf STDERR "%s[getColumns]:  Java exception: '%s'\n", $pkgname, $msg;
+            printf STDERR "%s[getColumnSizes]:  Java exception: '%s'\n", $pkgname, $msg;
         } else {
-            printf STDERR "%s[getColumns]:  ERROR: '%s'\n",$pkgname, $@;
+            printf STDERR "%s[getColumnSizes]:  ERROR: '%s'\n",$pkgname, $@;
         }
         return ();
     }
@@ -565,8 +577,7 @@ sub tablesCommand
     my $rsetb = undef;
     my $rsetc = undef;
 
-    #this seems to show tables from the connection db, irregardless:
-    #$dbname = undef;
+    #show the tables from the named database:
     eval {
         $rseta = $dbMetaData->getTables($dbname, "%", "%", []);
         #$rsetb = $dbMetaData->getSuperTables($dbname, "%", "%");
@@ -637,6 +648,24 @@ sub showDataBase
     $self->sql_exec("select DATABASE()");
 }
 
+sub getDbnameFromUrl
+{
+    my ($url) = @_;
+
+    return $1 if ( $url =~ /\/([^\/]+)$/ );
+    return undef;
+}
+
+sub setDbNameInUrl
+{
+    my ($url, $dbname) = @_;
+
+    $url =~ s/\/([^\/]+)$//;
+    return sprintf("%s/%s", $url, $dbname) if (defined($1));
+
+    return undef;
+}
+
 sub useCommand
 #change the database, get new metadata
 {
@@ -647,21 +676,22 @@ sub useCommand
         return;
     }
 
+    my $oldurl = $self->getJdbcUrl();
+
     #set connection to use new database name:
-
-    my $jdbcurl = $self->getJdbcUrl();
-    $jdbcurl =~ s|/[^/]+$||;
-
-    $self->setJdbcUrl(sprintf("%s/%s", $jdbcurl, $dbname));
+    $self->setJdbcUrl( &setDbNameInUrl($oldurl, $dbname) );
 
 printf STDERR "SET DATABASE TO '%s' jdbcurl='%s'\n", $dbname, $self->getJdbcUrl();
 
-    $self->sql_init_connection();
-
+#printf STDERR "GET NEW METADATA\n";
     #get metadata for new database:
-    printf STDERR "GET NEW METADATA\n";
-
-    $self->sql_exec(sprintf("use %s;", $dbname));
+    if ($self->sql_init_connection()) {
+        $self->sql_exec(sprintf("use %s;", $dbname));
+    } else {
+        #restore old connection url:
+        $self->setJdbcUrl($oldurl);
+        $self->sql_init_connection();
+    }
 }
 
 sub showConnection
