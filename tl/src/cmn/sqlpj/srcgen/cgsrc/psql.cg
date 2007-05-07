@@ -2,15 +2,15 @@
 
 {
     #this is sqlpj implementation:
-    PL_PACKAGE = psqlImpl
-    %include $PL_PACKAGE.defs
+    PL_PACKAGE = $PSQLIMPL_PACKAGE
+    %include psqlImpl.defs
     perl/prlobj.ptpl                 /$PL_PACKAGE.pm
 }
 
 {
     #main program:
-    PL_PACKAGE = psql
-    %include $PL_PACKAGE.defs
+    PL_PACKAGE = $TESTDBI_PACKAGE
+    %include psql.defs
     perl/prlskel.ptpl                 /$PL_PACKAGE.pl
 }
 

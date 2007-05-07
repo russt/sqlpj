@@ -6,7 +6,7 @@
 %ifndef CG_ROOT %include build_setup.defs
 
 { ## header section
-PL_PACKAGE = $PSQLIMPL_PACKAGE
+%ifndef PL_PACKAGE       PL_PACKAGE = $PSQLIMPL_PACKAGE
 PL_PACKAGE_DESCRIPTION = perl/jdbc sql command line interpreter
 
 #not a base class - use standard constuctor name:
@@ -332,6 +332,392 @@ sub sql_close_connection
     return 1;    #success
 }
 
+######
+#local command processing
+######
+
+sub localCommand
+#process a local command:
+#    help
+#    info
+{
+    my ($self, $buf) = @_;
+
+    #trim buf:
+    $buf =~ s/^\s+//;
+    $buf =~ s/[;\s]*$//;
+
+    if ($buf =~ /^help/i) {
+        $buf =~ s/help\s*//i;
+        $self->helpCommand($buf);
+    } elsif ($buf  =~ /^use/i) {
+        $buf =~ s/use\s*//i;
+        $self->useCommand($buf);
+    } elsif ($buf  =~ /^show/i) {
+        $buf =~ s/show\s*//i;
+        $self->showCommand($buf);
+    } elsif ($buf  =~ /^tables/i) {
+        $buf =~ s/tables\s*//i;
+        $self->tablesCommand($buf);
+    } elsif ($buf  =~ /^table/i) {
+        $buf =~ s/table\s*//i;
+        $self->tableCommand($buf);
+    } else {
+        return 0;    #not a local command
+    }
+
+    return 1;    #we found and processed a local command
+}
+
+sub helpCommand
+{
+    my ($self, $args) = @_;
+
+    print <<"!";
+Local commands are:
+ help                - show this message
+
+ tables [db]         - show information about tables in <db>, defaults to connection db.
+ tables name [db]    - show information about table <name> in <db>, defaults to connection db.
+
+ show conn[ection]   - show jdbc connection properties, including product & version
+ show create [table] - generate sql to create all tables, or a single table.
+ show db             - show db name
+ show metadata       - show jdbc metadata (long)
+
+ dump [table] [filename]
+                     - dump all or named table to stdout or <filename>
+!
+}
+
+sub showCreate
+#generate sql to create one or all tables
+{
+    my ($self, $buf) = @_;
+
+    #limit to one table?
+
+    #otherwise, get list of tables and show create for each table:
+}
+
+sub showDataBase
+#show database name
+{
+    my ($self, $buf) = @_;
+
+    $self->sql_exec("select DATABASE()");
+}
+
+sub tableCommand
+#implement the table command, which shows information about a single table
+#Usage:  table table_name
+{
+    my ($self, $args) = @_;
+
+    my ($tblname, $dbname) = split(/\s+/, $args);
+
+    my @excludenames = (
+        "TABLE_CAT",
+        "TABLE_SCHEM",
+#       "TABLE_NAME",
+#       "COLUMN_NAME",
+        "DATA_TYPE",
+#       "TYPE_NAME",
+#       "COLUMN_SIZE",
+        "BUFFER_LENGTH",
+        "DECIMAL_DIGITS",
+        "NUM_PREC_RADIX",
+        "NULLABLE",
+        "REMARKS",
+        "COLUMN_DEF",
+        "SQL_DATA_TYPE",
+        "SQL_DATETIME_SUB",
+        "CHAR_OCTET_LENGTH",
+        "ORDINAL_POSITION",
+        "IS_NULLABLE",
+    );
+
+    my @excludenamesb = (
+        "TABLE_CAT",
+        "TABLE_SCHEM",
+#       "TABLE_NAME",
+#       "COLUMN_NAME",
+#       "KEY_SEQ",
+#       "PK_NAME",
+    );
+
+    my @excludenamesc = (
+        "TABLE_CAT",
+        "TABLE_SCHEM",
+#       "TABLE_NAME",
+#       "NON_UNIQUE",
+#       "INDEX_QUALIFIER",
+#       "INDEX_NAME",
+        "TYPE",
+#       "ORDINAL_POSITION",
+#       "COLUMN_NAME",
+#       "ASC_OR_DESC",
+        "CARDINALITY",
+        "PAGES",
+        "FILTER_CONDITION"
+    );
+
+#printf STDERR "tblname='%s' dbname='%s'\n", $tblname, $dbname;
+
+    my $dbMetaData = $self->getMetaData();
+    my $rseta = undef;
+    my $rsetb = undef;
+    my $rsetc = undef;
+
+    eval {
+        #######
+        #column info
+        #######
+#'getColumns(String catalog, String schemaPattern, String tableNamePattern, String columnNamePattern)'  => 'ResultSet',
+        $rseta = $dbMetaData->getColumns($dbname, "%", $tblname, "%");
+
+
+#my $rseta_stmt =  $rseta->getStatement();
+#printf "STATEMENT FOR getColumns() resultSet='%s'\n", defined($rseta_stmt)? "defined" : "undefined";
+#my $rseta_stmt =  $rseta->getType();
+#printf "TYPE FOR getColumns() resultSet='%s'\n", defined($rseta_stmt)? $rseta_stmt : "undefined" ;
+
+        ########
+        #primary keys:
+        ########
+#'getPrimaryKeys(String catalog, String schema, String table)'  => 'ResultSet',
+        $rsetb = $dbMetaData->getPrimaryKeys($dbname, "%", $tblname);
+#$rsetb_stmt =  $rsetb->getStatement();
+#printf "STATEMENT FOR getPrimaryKeys()='%s'\n", $rsetb_stmt->toString();
+
+        #########
+        #Indicies
+        #########
+#'getIndexInfo(String catalog, String schema, String table, boolean unique, boolean approximate)'  => 'ResultSet',
+        $rsetc = $dbMetaData->getIndexInfo($dbname, "%", $tblname, 0, 0);
+    };
+
+    if ($@) {
+        if (caught("java.sql.SQLException")){
+            my $msg = $@->getMessage() ;
+            printf STDERR "%s[tablesCommand]:  Java exception: '%s'\n", $pkgname, $msg;
+        } else {
+            printf STDERR "%s[tablesCommand]:  ERROR: '%s'\n",$pkgname, $@;
+        }
+        return;
+    }
+
+    $self->displayResultSet($rseta, &columnExcludeMap($rseta, @excludenames ));
+    $self->displayResultSet($rsetb, &columnExcludeMap($rsetb, @excludenamesb));
+    $self->displayResultSet($rsetc, &columnExcludeMap($rsetc, @excludenamesc));
+}
+
+sub tablesCommand
+#implement the tables command, which shows information about tables
+{
+    my ($self, $dbname) = @_;
+#'getTables(String catalog, String schemaPattern, String tableNamePattern, String types[])'  => 'ResultSet',
+#'getSuperTables(String catalog, String schemaPattern, String tableNamePattern)'  => 'ResultSet',
+
+    my $dbMetaData = $self->getMetaData();
+
+    my $rseta = undef;
+
+    my @excludenames = (
+        "TABLE_CAT",
+        "TABLE_SCHEM",
+#       "TABLE_NAME",  #keep
+        "TABLE_TYPE",
+        "REMARKS",
+    );
+
+    #show the tables from the named database:
+    eval {
+        $rseta = $dbMetaData->getTables($dbname, "%", "%", []);
+        #$rsetb = $dbMetaData->getSuperTables($dbname, "%", "%");
+        #$rsetc = $dbMetaData->getSuperTypes($dbname, "%", "%");
+    };
+
+    if ($@) {
+        if (caught("java.sql.SQLException")){
+            my $msg = $@->getMessage() ;
+            printf STDERR "%s[tablesCommand]:  Java exception: '%s'\n", $pkgname, $msg;
+        } else {
+            printf STDERR "%s[tablesCommand]:  ERROR: '%s'\n",$pkgname, $@;
+        }
+        return;
+    }
+
+    $self->displayResultSet($rseta, &columnExcludeMap($rseta, @excludenames));
+}
+
+sub showCommand
+#show meta-info about the database and/or tables
+{
+    my ($self, $buf) = @_;
+
+    #trim buf:
+    $buf =~ s/^\s+//;
+    $buf =~ s/[;\s]*$//;
+
+# show conn[ection]   - show jdbc connection properties, including product & version
+# show create [table] - generate sql to create all tables, or a single table.
+# show db             - show db name
+# show metadata       - show jdbc metadata (long)
+    if ($buf =~ /^conn/i) {
+        $buf =~ s/conn.*\s*//i;
+        $self->showConnection($buf);
+    } elsif ($buf  =~ /^create/i) {
+        $buf =~ s/create\s*//i;
+        $self->showCreate($buf);
+    } elsif ($buf  =~ /^db/i) {
+        $buf =~ s/db\s*//i;
+        $self->showDataBase($buf);
+    } elsif ($buf  =~ /^meta/i) {
+        $buf =~ s/meta.*\s*//i;
+        $self->showMetaData($buf);
+    } else {
+        return 0;    #not a local command
+    }
+}
+
+sub useCommand
+#change the database, get new metadata
+{
+    my ($self, $dbname) = @_;
+
+    if (!defined($dbname) || $dbname eq "") {
+        printf STDERR "%s: use:  you must supply a database name\n", $pkgname;
+        return;
+    }
+
+    my $oldurl = $self->getJdbcUrl();
+
+    #set connection to use new database name:
+    $self->setJdbcUrl( &setDbNameInUrl($oldurl, $dbname) );
+
+#printf STDERR "SET DATABASE TO '%s' jdbcurl='%s'\n", $dbname, $self->getJdbcUrl();
+
+#printf STDERR "GET NEW METADATA\n";
+    #get metadata for new database:
+    if ($self->sql_init_connection()) {
+        $self->sql_exec(sprintf("use %s;", $dbname));
+    } else {
+        #restore old connection url:
+        $self->setJdbcUrl($oldurl);
+        $self->sql_init_connection();
+    }
+}
+
+sub showConnection
+#show database info
+{
+    my ($self, $buf) = @_;
+    my $func = "";
+
+    my $metafuncs = $self->metaFuncs();
+
+    $func = 'getURL()';
+    $self->callMetaFunc($func, $$metafuncs{$func});
+
+    $func = 'getUserName()';
+    $self->callMetaFunc($func, $$metafuncs{$func});
+
+    $func = 'getDriverName()';
+    $self->callMetaFunc($func, $$metafuncs{$func});
+
+    $func = 'getDriverVersion()';
+    $self->callMetaFunc($func, $$metafuncs{$func});
+
+    $func = 'getDatabaseProductName()';
+    $self->callMetaFunc($func, $$metafuncs{$func});
+
+    $func = 'getDatabaseProductVersion()';
+    $self->callMetaFunc($func, $$metafuncs{$func});
+}
+
+sub showMetaData
+#show meta-info about the database and/or tables
+{
+    my ($self, $buf) = @_;
+
+    my $metafuncs = $self->metaFuncs();
+
+    my (@noargkeys)     = grep($_ =~ /\(\)$/, sort keys %$metafuncs);
+    my (@yesargkeys)    = grep($_ !~ /\(\)$/, sort keys %$metafuncs);
+    my (@boolkeys)      = grep($$metafuncs{$_} eq "boolean", @noargkeys);
+    my (@intkeys)       = grep($$metafuncs{$_} eq "int", @noargkeys);
+    my (@strkeys)       = grep($$metafuncs{$_} eq "String", @noargkeys);
+    my (@resultSetkeys) = grep($$metafuncs{$_} eq "ResultSet", @noargkeys);
+
+    my $divider =  "-" x 56 . "\n";
+
+    for my $kk (@boolkeys) {
+        $self->callMetaFunc($kk, $$metafuncs{$kk});
+    }
+
+    print $divider;
+
+    for my $kk (@strkeys) {
+        $self->callMetaFunc($kk, $$metafuncs{$kk});
+    }
+
+    print $divider;
+
+    for my $kk (@intkeys) {
+        $self->callMetaFunc($kk, $$metafuncs{$kk});
+    }
+
+    print $divider;
+
+    for my $kk (@resultSetkeys) {
+        $self->callMetaFunc($kk, $$metafuncs{$kk});
+    }
+
+    print $divider;
+
+#printf "yesargkeys=(%s)\n", join(",", @yesargkeys);
+    for my $kk (@yesargkeys) {
+        printf "%-56s %s\n", $kk, $$metafuncs{$kk};
+    }
+}
+
+sub callMetaFunc
+{
+    my ($self, $func, $type) = @_;
+
+    my $dbMetaData = $self->getMetaData();
+    my $call = '$dbMetaData->' . "$func";
+
+    my $val = eval($call);
+    my $valstr = "$val";
+
+    if ($type eq "boolean") {
+        $valstr = ($val ? "true" : "false")
+    } elsif ($type eq "int") {
+        ;
+    } elsif ($type eq "String") {
+        ;
+    } elsif ($type eq "ResultSet") {
+        # dump the result:
+        printf "\n%s:\n", $func;
+        $self->displayResultSet($val);
+        return;
+    } elsif ($type eq "Connection") {
+        ;
+    } else {
+        ;
+    }
+
+    printf "%-56s %s\n", $func, $valstr;
+}
+
+#########
+#accessor methods for {=PL_PACKAGE=} object attributes:
+#########
+
+{=getset_methods=}
+
 #######
 #static class methods
 #######
@@ -520,256 +906,6 @@ sub maxwidth
     return (($ii >= $jj)? $ii : $jj);
 }
 
-######
-#local command processing
-######
-
-sub localCommand
-#process a local command:
-#    help
-#    info
-{
-    my ($self, $buf) = @_;
-
-    #trim buf:
-    $buf =~ s/^\s+//;
-    $buf =~ s/[;\s]*$//;
-
-    if ($buf =~ /^help/i) {
-        $buf =~ s/help\s*//i;
-        $self->helpCommand($buf);
-    } elsif ($buf  =~ /^use/i) {
-        $buf =~ s/use\s*//i;
-        $self->useCommand($buf);
-    } elsif ($buf  =~ /^show/i) {
-        $buf =~ s/show\s*//i;
-        $self->showCommand($buf);
-    } elsif ($buf  =~ /^tables/i) {
-        $buf =~ s/tables\s*//i;
-        $self->tablesCommand($buf);
-    } elsif ($buf  =~ /^table/i) {
-        $buf =~ s/table\s*//i;
-        $self->tableCommand($buf);
-    } else {
-        return 0;    #not a local command
-    }
-
-    return 1;    #we found and processed a local command
-}
-
-sub helpCommand
-{
-    my ($self, $args) = @_;
-
-    print <<"!";
-Local commands are:
- help                - show this message
-
- tables [db]         - show information about tables in <db>, defaults to connection db.
- tables name [db]    - show information about table <name> in <db>, defaults to connection db.
-
- show conn[ection]   - show jdbc connection properties, including product & version
- show create [table] - generate sql to create all tables, or a single table.
- show db             - show db name
- show metadata       - show jdbc metadata (long)
-
- dump [table] [filename]
-                     - dump all or named table to stdout or <filename>
-!
-}
-
-sub tableCommand
-#implement the table command, which shows information about a single table
-#Usage:  table table_name
-{
-    my ($self, $args) = @_;
-
-    my ($tblname, $dbname) = split(/\s+/, $args);
-
-    my @excludenames = (
-        "TABLE_CAT",
-        "TABLE_SCHEM",
-#       "TABLE_NAME",
-#       "COLUMN_NAME",
-        "DATA_TYPE",
-#       "TYPE_NAME",
-#       "COLUMN_SIZE",
-        "BUFFER_LENGTH",
-        "DECIMAL_DIGITS",
-        "NUM_PREC_RADIX",
-        "NULLABLE",
-        "REMARKS",
-        "COLUMN_DEF",
-        "SQL_DATA_TYPE",
-        "SQL_DATETIME_SUB",
-        "CHAR_OCTET_LENGTH",
-        "ORDINAL_POSITION",
-        "IS_NULLABLE",
-    );
-
-    my @excludenamesb = (
-        "TABLE_CAT",
-        "TABLE_SCHEM",
-#       "TABLE_NAME",
-#       "COLUMN_NAME",
-#       "KEY_SEQ",
-#       "PK_NAME",
-    );
-
-    my @excludenamesc = (
-        "TABLE_CAT",
-        "TABLE_SCHEM",
-#       "TABLE_NAME",
-#       "NON_UNIQUE",
-#       "INDEX_QUALIFIER",
-#       "INDEX_NAME",
-        "TYPE",
-#       "ORDINAL_POSITION",
-#       "COLUMN_NAME",
-#       "ASC_OR_DESC",
-        "CARDINALITY",
-        "PAGES",
-        "FILTER_CONDITION"
-    );
-
-#printf STDERR "tblname='%s' dbname='%s'\n", $tblname, $dbname;
-
-    my $dbMetaData = $self->getMetaData();
-    my $rseta = undef;
-    my $rsetb = undef;
-    my $rsetc = undef;
-
-    eval {
-        #######
-        #column info
-        #######
-#'getColumns(String catalog, String schemaPattern, String tableNamePattern, String columnNamePattern)'  => 'ResultSet',
-        $rseta = $dbMetaData->getColumns($dbname, "%", $tblname, "%");
-
-
-#my $rseta_stmt =  $rseta->getStatement();
-#printf "STATEMENT FOR getColumns() resultSet='%s'\n", defined($rseta_stmt)? "defined" : "undefined";
-#my $rseta_stmt =  $rseta->getType();
-#printf "TYPE FOR getColumns() resultSet='%s'\n", defined($rseta_stmt)? $rseta_stmt : "undefined" ;
-
-        ########
-        #primary keys:
-        ########
-#'getPrimaryKeys(String catalog, String schema, String table)'  => 'ResultSet',
-        $rsetb = $dbMetaData->getPrimaryKeys($dbname, "%", $tblname);
-#$rsetb_stmt =  $rsetb->getStatement();
-#printf "STATEMENT FOR getPrimaryKeys()='%s'\n", $rsetb_stmt->toString();
-
-        #########
-        #Indicies
-        #########
-#'getIndexInfo(String catalog, String schema, String table, boolean unique, boolean approximate)'  => 'ResultSet',
-        $rsetc = $dbMetaData->getIndexInfo($dbname, "%", $tblname, 0, 0);
-    };
-
-    if ($@) {
-        if (caught("java.sql.SQLException")){
-            my $msg = $@->getMessage() ;
-            printf STDERR "%s[tablesCommand]:  Java exception: '%s'\n", $pkgname, $msg;
-        } else {
-            printf STDERR "%s[tablesCommand]:  ERROR: '%s'\n",$pkgname, $@;
-        }
-        return;
-    }
-
-    $self->displayResultSet($rseta, &columnExcludeMap($rseta, @excludenames ));
-    $self->displayResultSet($rsetb, &columnExcludeMap($rsetb, @excludenamesb));
-    $self->displayResultSet($rsetc, &columnExcludeMap($rsetc, @excludenamesc));
-}
-
-sub tablesCommand
-#implement the tables command, which shows information about tables
-{
-    my ($self, $dbname) = @_;
-#'getTables(String catalog, String schemaPattern, String tableNamePattern, String types[])'  => 'ResultSet',
-#'getSuperTables(String catalog, String schemaPattern, String tableNamePattern)'  => 'ResultSet',
-
-    my $dbMetaData = $self->getMetaData();
-
-    my $rseta = undef;
-
-    my @excludenames = (
-        "TABLE_CAT",
-        "TABLE_SCHEM",
-#       "TABLE_NAME",  #keep
-        "TABLE_TYPE",
-        "REMARKS",
-    );
-
-    #show the tables from the named database:
-    eval {
-        $rseta = $dbMetaData->getTables($dbname, "%", "%", []);
-        #$rsetb = $dbMetaData->getSuperTables($dbname, "%", "%");
-        #$rsetc = $dbMetaData->getSuperTypes($dbname, "%", "%");
-    };
-
-    if ($@) {
-        if (caught("java.sql.SQLException")){
-            my $msg = $@->getMessage() ;
-            printf STDERR "%s[tablesCommand]:  Java exception: '%s'\n", $pkgname, $msg;
-        } else {
-            printf STDERR "%s[tablesCommand]:  ERROR: '%s'\n",$pkgname, $@;
-        }
-        return;
-    }
-
-    $self->displayResultSet($rseta, &columnExcludeMap($rseta, @excludenames));
-}
-
-sub showCommand
-#show meta-info about the database and/or tables
-{
-    my ($self, $buf) = @_;
-
-    #trim buf:
-    $buf =~ s/^\s+//;
-    $buf =~ s/[;\s]*$//;
-
-# show conn[ection]   - show jdbc connection properties, including product & version
-# show create [table] - generate sql to create all tables, or a single table.
-# show db             - show db name
-# show metadata       - show jdbc metadata (long)
-    if ($buf =~ /^conn/i) {
-        $buf =~ s/conn.*\s*//i;
-        $self->showConnection($buf);
-    } elsif ($buf  =~ /^create/i) {
-        $buf =~ s/create\s*//i;
-        $self->showCreate($buf);
-    } elsif ($buf  =~ /^db/i) {
-        $buf =~ s/db\s*//i;
-        $self->showDataBase($buf);
-    } elsif ($buf  =~ /^meta/i) {
-        $buf =~ s/meta.*\s*//i;
-        $self->showMetaData($buf);
-    } else {
-        return 0;    #not a local command
-    }
-}
-
-sub showCreate
-#show database name
-{
-    my ($self, $buf) = @_;
-
-    #limit to one table?
-
-    #otherwise, get list of tables and show create for each table:
-
-}
-
-sub showDataBase
-#show database name
-{
-    my ($self, $buf) = @_;
-
-    $self->sql_exec("select DATABASE()");
-}
-
 sub getDbnameFromUrl
 {
     my ($url) = @_;
@@ -788,142 +924,6 @@ sub setDbNameInUrl
     return undef;
 }
 
-sub useCommand
-#change the database, get new metadata
-{
-    my ($self, $dbname) = @_;
-
-    if (!defined($dbname) || $dbname eq "") {
-        printf STDERR "%s: use:  you must supply a database name\n", $pkgname;
-        return;
-    }
-
-    my $oldurl = $self->getJdbcUrl();
-
-    #set connection to use new database name:
-    $self->setJdbcUrl( &setDbNameInUrl($oldurl, $dbname) );
-
-#printf STDERR "SET DATABASE TO '%s' jdbcurl='%s'\n", $dbname, $self->getJdbcUrl();
-
-#printf STDERR "GET NEW METADATA\n";
-    #get metadata for new database:
-    if ($self->sql_init_connection()) {
-        $self->sql_exec(sprintf("use %s;", $dbname));
-    } else {
-        #restore old connection url:
-        $self->setJdbcUrl($oldurl);
-        $self->sql_init_connection();
-    }
-}
-
-sub showConnection
-#show database info
-{
-    my ($self, $buf) = @_;
-    my $func = "";
-
-    my $metafuncs = $self->metaFuncs();
-
-    $func = 'getURL()';
-    $self->callMetaFunc($func, $$metafuncs{$func});
-
-    $func = 'getUserName()';
-    $self->callMetaFunc($func, $$metafuncs{$func});
-
-    $func = 'getDriverName()';
-    $self->callMetaFunc($func, $$metafuncs{$func});
-
-    $func = 'getDriverVersion()';
-    $self->callMetaFunc($func, $$metafuncs{$func});
-
-    $func = 'getDatabaseProductName()';
-    $self->callMetaFunc($func, $$metafuncs{$func});
-
-    $func = 'getDatabaseProductVersion()';
-    $self->callMetaFunc($func, $$metafuncs{$func});
-}
-
-sub showMetaData
-#show meta-info about the database and/or tables
-{
-    my ($self, $buf) = @_;
-
-    my $metafuncs = $self->metaFuncs();
-
-    my (@noargkeys)     = grep($_ =~ /\(\)$/, sort keys %$metafuncs);
-    my (@yesargkeys)    = grep($_ !~ /\(\)$/, sort keys %$metafuncs);
-    my (@boolkeys)      = grep($$metafuncs{$_} eq "boolean", @noargkeys);
-    my (@intkeys)       = grep($$metafuncs{$_} eq "int", @noargkeys);
-    my (@strkeys)       = grep($$metafuncs{$_} eq "String", @noargkeys);
-    my (@resultSetkeys) = grep($$metafuncs{$_} eq "ResultSet", @noargkeys);
-
-    my $divider =  "-" x 56 . "\n";
-
-    for my $kk (@boolkeys) {
-        $self->callMetaFunc($kk, $$metafuncs{$kk});
-    }
-
-    print $divider;
-
-    for my $kk (@strkeys) {
-        $self->callMetaFunc($kk, $$metafuncs{$kk});
-    }
-
-    print $divider;
-
-    for my $kk (@intkeys) {
-        $self->callMetaFunc($kk, $$metafuncs{$kk});
-    }
-
-    print $divider;
-
-    for my $kk (@resultSetkeys) {
-        $self->callMetaFunc($kk, $$metafuncs{$kk});
-    }
-
-    print $divider;
-
-#printf "yesargkeys=(%s)\n", join(",", @yesargkeys);
-    for my $kk (@yesargkeys) {
-        printf "%-56s %s\n", $kk, $$metafuncs{$kk};
-    }
-}
-
-sub callMetaFunc
-{
-    my ($self, $func, $type) = @_;
-
-    my $dbMetaData = $self->getMetaData();
-    my $call = '$dbMetaData->' . "$func";
-
-    my $val = eval($call);
-    my $valstr = "$val";
-
-    if ($type eq "boolean") {
-        $valstr = ($val ? "true" : "false")
-    } elsif ($type eq "int") {
-        ;
-    } elsif ($type eq "String") {
-        ;
-    } elsif ($type eq "ResultSet") {
-        # dump the result:
-        printf "\n%s:\n", $func;
-        $self->displayResultSet($val);
-        return;
-    } elsif ($type eq "Connection") {
-        ;
-    } else {
-        ;
-    }
-
-    printf "%-56s %s\n", $func, $valstr;
-}
-
-#########
-#accessor methods for {=PL_PACKAGE=} object attributes:
-#########
-
-{=getset_methods=}
 EOF
 
 %evalmacro PL_PKG_METHODS PL_PKG_METHODS

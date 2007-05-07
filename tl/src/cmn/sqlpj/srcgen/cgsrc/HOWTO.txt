@@ -1,0 +1,14 @@
+Q:  How do I select a column value by name from a rowset?
+
+A:  we need a new routine for this, which has a list of column names we want
+    to display from the row-set.
+
+sub getColumns
+sub displayResultSet
+    #this gets the header:
+    push @allrows, [&getColumns($rset)];
+
+    #this gets the rows:
+    while ($rset->next()) {
+        push @allrows, [&getRow($rset)];
+    }

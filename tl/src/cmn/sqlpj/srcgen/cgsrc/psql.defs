@@ -3,7 +3,7 @@
 # psql.pl - prlskel program derived from template: perl/prlskel.ptpl
 
 { ### psql defs
-PL_PACKAGE = $TESTDBI_PACKAGE
+%ifndef PL_PACKAGE       PL_PACKAGE = $TESTDBI_PACKAGE
 PL_PACKAGE_DESCRIPTION = test the perl dbi, jdbc interfaces
 
 PL_PKG_IMPORTS = << EOF
@@ -17,7 +17,7 @@ my $USER          = "{=MOJAVE_INF_USER=}";
 my $PASSWORD      = "{=MOJAVE_INF_PASSWD=}";
 my $USE_STDIN = 1;
 my @SQLFILES = ();
-my $PROMPT = "psql> ";
+my $PROMPT = "sqlpj> ";
 EOF
 %evalmacro PL_PKG_ATTRIBUTES PL_PKG_ATTRIBUTES
 }

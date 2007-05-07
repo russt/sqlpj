@@ -1,0 +1,21 @@
+
+----------  DONE, 5/6/07
+when I do "use newdb" and then "tables", it returns the tables from the
+connection db, not the new db.
+
+I.e., I need to intercept the "use" command, and retrieve the metadata
+from the new database whenever it is issued.
+----------
+
+MISSING FEATURES:
+
+o FEATURE: add -V (version) arg.
+o FEATURE: show create [table] - generate sql to create a table, including indices
+o FEATURE: ORACLE SUPPORT: test all features against ORACLE instance
+o FEATURE: arguments to set jdbc parameter, or -props <file> to read from a property file
+
+COMPLETED FEATURES:
+o FEATURE: show conn[ection] - show jdbc connection properties, including product & version
+  [DONE 5/5/07]
+o FEATURE: show db - show db name
+  [DONE 5/5/07]
