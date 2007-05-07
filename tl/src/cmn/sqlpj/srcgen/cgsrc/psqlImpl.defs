@@ -193,7 +193,7 @@ sub sql_exec
 sub displayResultSet
 # display resultSet <rset>
 {
-    my ($self, $rset) = @_;
+    my ($self, $rset, @cnames) = @_;
 
     return "(null)" unless defined($rset);
 
@@ -201,11 +201,11 @@ sub displayResultSet
     my @allrows = ();
     
     #save column headers:
-    push @allrows, [&getColumns($rset)];
+    push @allrows, [&getColumns($rset, @cnames)];
 
     #save data rows:
     while ($rset->next()) {
-        push @allrows, [&getRow($rset)];
+        push @allrows, [&getRow($rset, @cnames)];
     }
 
     #next, we iterate through the rows to set the max column size:
@@ -338,12 +338,15 @@ sub sql_close_connection
 
 sub getColumns
 #return the list of column names for a result set
+#if <cnames> is set, then only show the named columns.
 {
-    my ($rset) = @_;
+    my ($rset, @cnames) = @_;
 
     return () unless defined($rset);
 
     my (@header) = ();
+    my $byname = $#cnames >= 0;
+#printf STDERR "getColumns:  #cnames=%d byname=%d cnames=(%s)\n", $#cnames, $byname, join(",", @cnames);
 
     eval {
         my $m        = $rset->getMetaData();
@@ -351,7 +354,13 @@ sub getColumns
 
         #store column headers:
         for (my $ii = 1; $ii <= $colcnt; $ii++) {
-            push @header, $m->getColumnLabel($ii);
+            my $cname = $m->getColumnLabel($ii);
+#printf STDERR "getColumns: grep(%s,%s)=%d\n", $cname, join(",", @cnames), scalar(grep($cname eq $_, @cnames));
+            if ($byname) {
+                push @header, $cname if (grep($cname eq $_, @cnames));
+            } else {
+                push @header, $cname;
+            }
         }
     };
 
@@ -370,19 +379,25 @@ sub getColumns
 
 sub getColumnSizes
 #return the list of column display sizes for a result set
+#if <cnames> is set, then collect for the named columns.
 {
-    my ($rset) = @_;
+    my ($rset, @cnames) = @_;
 
     return () unless defined($rset);
 
     my (@widths) = ();
+    my $byname = $#cnames >= 0;
 
     eval {
         my $m        = $rset->getMetaData();
         my $colcnt   = $m->getColumnCount();
 
         for (my $ii = 1; $ii <= $colcnt; $ii++) {
-            push @widths, $m->getColumnDisplaySize($ii);
+            if ($byname) {
+                push @widths, $m->getColumnDisplaySize($ii) if (grep($m->getColumnLabel($ii) eq $_, @cnames));
+            } else {
+                push @widths, $m->getColumnDisplaySize($ii);
+            }
         }
     };
 
@@ -400,21 +415,30 @@ sub getColumnSizes
 }
 
 sub getRow
-#return the list of column names for a result set
+#return the list of row values for the current row of <rset>.
+#if <cnames> is set, then only retrieve the named columns.
 {
-    my ($rset) = @_;
+    my ($rset, @cnames) = @_;
 
     return () unless defined($rset);
 
     my (@data) = ();
+    my $byname = $#cnames >= 0;
 
     eval {
-        my $colcnt   = $rset->getMetaData()->getColumnCount();
+        my $m        = $rset->getMetaData();
+        my $colcnt   = $m->getColumnCount();
 
         for (my $ii = 1; $ii <= $colcnt; $ii++) {
             #note - you have to do the fetch first, which sets wasNull() for the current column.
             my $str = $rset->getString($ii);
-            push @data, ($rset->wasNull())? "(null)" : $str;
+            $str = $rset->wasNull() ? "(null)" : $str;
+
+            if ($byname) {
+                push @data, $str if (grep($m->getColumnLabel($ii) eq $_, @cnames));
+            } else {
+                push @data, $str;
+            }
         }
     };
 
@@ -525,29 +549,60 @@ sub tableCommand
 
     my ($tblname, $dbname) = split(/\s+/, $args);
 
-    my $dbMetaData = $self->getMetaData();
-
-    my $rseta = undef;
-    my $rsetb = undef;
-
-    my $rseta_stmt = undef;
-    my $rsetb_stmt = undef;
-
-#'getColumns(String catalog, String schemaPattern, String tableNamePattern, String columnNamePattern)'  => 'ResultSet',
-#'getPrimaryKeys(String catalog, String schema, String table)'  => 'ResultSet',
+    my @cnames = (
+#   "TABLE_CAT",
+#   "TABLE_SCHEM",
+    "TABLE_NAME",
+    "COLUMN_NAME",
+#   "DATA_TYPE",
+    "TYPE_NAME",
+    "COLUMN_SIZE",
+#   "BUFFER_LENGTH",
+#   "DECIMAL_DIGITS",
+#   "NUM_PREC_RADIX",
+#   "NULLABLE",
+#   "REMARKS",
+#   "COLUMN_DEF",
+#   "SQL_DATA_TYPE",
+#   "SQL_DATETIME_SUB",
+#   "CHAR_OCTET_LENGTH",
+#   "ORDINAL_POSITION",
+#   "IS_NULLABLE",
+    );
 
 #printf STDERR "tblname='%s' dbname='%s'\n", $tblname, $dbname;
 
-    eval {
-        $rseta = $dbMetaData->getColumns($dbname, "%", $tblname, "%");
-        $rseta_stmt =  $rseta->getStatement();
-        printf "STATEMENT FOR getColumns() resultSet='%s'\n", defined($rseta_stmt)? "defined" : "undefined";
-        $rseta_stmt =  $rseta->getType();
-        printf "TYPE FOR getColumns() resultSet='%s'\n", defined($rseta_stmt)? $rseta_stmt : "undefined" ;
+    my $dbMetaData = $self->getMetaData();
+    my $rseta = undef;
+    my $rsetb = undef;
+    my $rsetc = undef;
 
+    eval {
+        #######
+        #column info
+        #######
+#'getColumns(String catalog, String schemaPattern, String tableNamePattern, String columnNamePattern)'  => 'ResultSet',
+        $rseta = $dbMetaData->getColumns($dbname, "%", $tblname, "%");
+
+
+#my $rseta_stmt =  $rseta->getStatement();
+#printf "STATEMENT FOR getColumns() resultSet='%s'\n", defined($rseta_stmt)? "defined" : "undefined";
+#my $rseta_stmt =  $rseta->getType();
+#printf "TYPE FOR getColumns() resultSet='%s'\n", defined($rseta_stmt)? $rseta_stmt : "undefined" ;
+
+        ########
+        #primary keys:
+        ########
+#'getPrimaryKeys(String catalog, String schema, String table)'  => 'ResultSet',
         $rsetb = $dbMetaData->getPrimaryKeys($dbname, "%", $tblname);
-        #$rsetb_stmt =  $rsetb->getStatement();
-        #printf "STATEMENT FOR getPrimaryKeys()='%s'\n", $rsetb_stmt->toString();
+#$rsetb_stmt =  $rsetb->getStatement();
+#printf "STATEMENT FOR getPrimaryKeys()='%s'\n", $rsetb_stmt->toString();
+
+        #########
+        #Indicies
+        #########
+#'getIndexInfo(String catalog, String schema, String table, boolean unique, boolean approximate)'  => 'ResultSet',
+        $rsetc = $dbMetaData->getIndexInfo($dbname, "%", $tblname, 0, 0);
     };
 
     if ($@) {
@@ -560,8 +615,9 @@ sub tableCommand
         return;
     }
 
-    $self->displayResultSet($rseta);
+    $self->displayResultSet($rseta, @cnames);
     $self->displayResultSet($rsetb);
+    $self->displayResultSet($rsetc);
 }
 
 sub tablesCommand
@@ -576,6 +632,8 @@ sub tablesCommand
     my $rseta = undef;
     my $rsetb = undef;
     my $rsetc = undef;
+
+    my @cnames = ("TABLE_CAT", "TABLE_NAME");
 
     #show the tables from the named database:
     eval {
@@ -594,7 +652,7 @@ sub tablesCommand
         return;
     }
 
-    $self->displayResultSet($rseta);
+    $self->displayResultSet($rseta, @cnames);
     #$self->displayResultSet($rsetb);
     #$self->displayResultSet($rsetc);
 }
