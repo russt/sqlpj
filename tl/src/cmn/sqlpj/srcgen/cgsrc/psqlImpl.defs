@@ -193,7 +193,7 @@ sub sql_exec
 sub displayResultSet
 # display resultSet <rset>
 {
-    my ($self, $rset, @cnames) = @_;
+    my ($self, $rset, @colmap) = @_;
 
     return "(null)" unless defined($rset);
 
@@ -201,11 +201,11 @@ sub displayResultSet
     my @allrows = ();
     
     #save column headers:
-    push @allrows, [&getColumns($rset, @cnames)];
+    push @allrows, [&getColumns($rset, @colmap)];
 
     #save data rows:
     while ($rset->next()) {
-        push @allrows, [&getRow($rset, @cnames)];
+        push @allrows, [&getRow($rset, @colmap)];
     }
 
     #next, we iterate through the rows to set the max column size:
@@ -336,17 +336,69 @@ sub sql_close_connection
 #static class methods
 #######
 
-sub getColumns
-#return the list of column names for a result set
-#if <cnames> is set, then only show the named columns.
+sub columnExcludeMap
+#return an array map excluding <cnames>.
+#in the returned map, 0 => column not selected for display.
 {
     my ($rset, @cnames) = @_;
 
     return () unless defined($rset);
 
+    my (@selected) = ();
+
+#printf STDERR "columnExcludeMap:  #cnames=%d cnames=(%s)\n", $#cnames, join(",", @cnames);
+
+    eval {
+        my $m        = $rset->getMetaData();
+        my $colcnt   = $m->getColumnCount();
+
+        #if no columns are excluded...
+        if ($#cnames < 0) {
+            #then return all 1's:
+            @selected = ((1) x $colcnt);
+#printf STDERR "columnExcludeMap:  RETURN A: selected=(%s)\n", join(",", @selected);
+            return @selected;
+        }
+
+        #otherwise, exclude columns named in <cnames>:
+        for (my $ii = 1; $ii <= $colcnt; $ii++) {
+            my $cname = $m->getColumnLabel($ii);
+#printf STDERR "columnExcludeMap: grep(%s,(%s))=%d\n", $cname, join(",", @cnames), scalar(grep($cname eq $_, @cnames));
+
+            #exlcude  found   selected
+            #      0      0          0
+            #      0      1          1
+            #      1      0          1
+            #      1      1          0
+
+            push @selected, (scalar(grep($cname eq $_, @cnames))? 0 : 1);
+        }
+    };
+
+    if ($@) {
+        if (caught("java.sql.SQLException")){
+            my $msg = $@->getMessage() ;
+            printf STDERR "%s[columnExcludeMap]:  Java exception: '%s'\n", $pkgname, $msg;
+        } else {
+            printf STDERR "%s[columnExcludeMap]:  ERROR: '%s'\n",$pkgname, $@;
+        }
+        return ();
+    }
+
+#printf STDERR "columnExcludeMap:  RETURN B: selected=(%s)\n", join(",", @selected);
+    return @selected;
+}
+
+sub getColumns
+#return the list of column names for a result set
+#we only return the columns numbers in <colmap>.
+{
+    my ($rset, @colmap) = @_;
+
+    return () unless defined($rset);
+
     my (@header) = ();
-    my $byname = $#cnames >= 0;
-#printf STDERR "getColumns:  #cnames=%d byname=%d cnames=(%s)\n", $#cnames, $byname, join(",", @cnames);
+#printf STDERR "getColumns:  #colmap=%d colmap=(%s)\n", $#colmap, join(",", @colmap);
 
     eval {
         my $m        = $rset->getMetaData();
@@ -354,13 +406,7 @@ sub getColumns
 
         #store column headers:
         for (my $ii = 1; $ii <= $colcnt; $ii++) {
-            my $cname = $m->getColumnLabel($ii);
-#printf STDERR "getColumns: grep(%s,%s)=%d\n", $cname, join(",", @cnames), scalar(grep($cname eq $_, @cnames));
-            if ($byname) {
-                push @header, $cname if (grep($cname eq $_, @cnames));
-            } else {
-                push @header, $cname;
-            }
+            push @header, $m->getColumnLabel($ii) if ($colmap[$ii-1]);
         }
     };
 
@@ -379,25 +425,20 @@ sub getColumns
 
 sub getColumnSizes
 #return the list of column display sizes for a result set
-#if <cnames> is set, then collect for the named columns.
+#if <colmap> is set, then collect for the named columns.
 {
-    my ($rset, @cnames) = @_;
+    my ($rset, @colmap) = @_;
 
     return () unless defined($rset);
 
     my (@widths) = ();
-    my $byname = $#cnames >= 0;
 
     eval {
         my $m        = $rset->getMetaData();
         my $colcnt   = $m->getColumnCount();
 
         for (my $ii = 1; $ii <= $colcnt; $ii++) {
-            if ($byname) {
-                push @widths, $m->getColumnDisplaySize($ii) if (grep($m->getColumnLabel($ii) eq $_, @cnames));
-            } else {
-                push @widths, $m->getColumnDisplaySize($ii);
-            }
+            push @widths, $m->getColumnDisplaySize($ii) if ($colmap[$ii-1]);
         }
     };
 
@@ -416,29 +457,25 @@ sub getColumnSizes
 
 sub getRow
 #return the list of row values for the current row of <rset>.
-#if <cnames> is set, then only retrieve the named columns.
+#if <colmap> is set, then only retrieve the named columns.
 {
-    my ($rset, @cnames) = @_;
+    my ($rset, @colmap) = @_;
 
     return () unless defined($rset);
 
     my (@data) = ();
-    my $byname = $#cnames >= 0;
 
     eval {
         my $m        = $rset->getMetaData();
         my $colcnt   = $m->getColumnCount();
 
         for (my $ii = 1; $ii <= $colcnt; $ii++) {
+            next unless ($colmap[$ii-1]);   #skip if column is not selected
+
             #note - you have to do the fetch first, which sets wasNull() for the current column.
             my $str = $rset->getString($ii);
             $str = $rset->wasNull() ? "(null)" : $str;
-
-            if ($byname) {
-                push @data, $str if (grep($m->getColumnLabel($ii) eq $_, @cnames));
-            } else {
-                push @data, $str;
-            }
+            push @data, $str;
         }
     };
 
@@ -549,25 +586,50 @@ sub tableCommand
 
     my ($tblname, $dbname) = split(/\s+/, $args);
 
-    my @cnames = (
-#   "TABLE_CAT",
-#   "TABLE_SCHEM",
-    "TABLE_NAME",
-    "COLUMN_NAME",
-#   "DATA_TYPE",
-    "TYPE_NAME",
-    "COLUMN_SIZE",
-#   "BUFFER_LENGTH",
-#   "DECIMAL_DIGITS",
-#   "NUM_PREC_RADIX",
-#   "NULLABLE",
-#   "REMARKS",
-#   "COLUMN_DEF",
-#   "SQL_DATA_TYPE",
-#   "SQL_DATETIME_SUB",
-#   "CHAR_OCTET_LENGTH",
-#   "ORDINAL_POSITION",
-#   "IS_NULLABLE",
+    my @excludenames = (
+        "TABLE_CAT",
+        "TABLE_SCHEM",
+#       "TABLE_NAME",
+#       "COLUMN_NAME",
+        "DATA_TYPE",
+#       "TYPE_NAME",
+#       "COLUMN_SIZE",
+        "BUFFER_LENGTH",
+        "DECIMAL_DIGITS",
+        "NUM_PREC_RADIX",
+        "NULLABLE",
+        "REMARKS",
+        "COLUMN_DEF",
+        "SQL_DATA_TYPE",
+        "SQL_DATETIME_SUB",
+        "CHAR_OCTET_LENGTH",
+        "ORDINAL_POSITION",
+        "IS_NULLABLE",
+    );
+
+    my @excludenamesb = (
+        "TABLE_CAT",
+        "TABLE_SCHEM",
+#       "TABLE_NAME",
+#       "COLUMN_NAME",
+#       "KEY_SEQ",
+#       "PK_NAME",
+    );
+
+    my @excludenamesc = (
+        "TABLE_CAT",
+        "TABLE_SCHEM",
+#       "TABLE_NAME",
+#       "NON_UNIQUE",
+#       "INDEX_QUALIFIER",
+#       "INDEX_NAME",
+        "TYPE",
+#       "ORDINAL_POSITION",
+#       "COLUMN_NAME",
+#       "ASC_OR_DESC",
+        "CARDINALITY",
+        "PAGES",
+        "FILTER_CONDITION"
     );
 
 #printf STDERR "tblname='%s' dbname='%s'\n", $tblname, $dbname;
@@ -615,9 +677,9 @@ sub tableCommand
         return;
     }
 
-    $self->displayResultSet($rseta, @cnames);
-    $self->displayResultSet($rsetb);
-    $self->displayResultSet($rsetc);
+    $self->displayResultSet($rseta, &columnExcludeMap($rseta, @excludenames ));
+    $self->displayResultSet($rsetb, &columnExcludeMap($rsetb, @excludenamesb));
+    $self->displayResultSet($rsetc, &columnExcludeMap($rsetc, @excludenamesc));
 }
 
 sub tablesCommand
@@ -630,10 +692,14 @@ sub tablesCommand
     my $dbMetaData = $self->getMetaData();
 
     my $rseta = undef;
-    my $rsetb = undef;
-    my $rsetc = undef;
 
-    my @cnames = ("TABLE_CAT", "TABLE_NAME");
+    my @excludenames = (
+        "TABLE_CAT",
+        "TABLE_SCHEM",
+#       "TABLE_NAME",  #keep
+        "TABLE_TYPE",
+        "REMARKS",
+    );
 
     #show the tables from the named database:
     eval {
@@ -652,9 +718,7 @@ sub tablesCommand
         return;
     }
 
-    $self->displayResultSet($rseta, @cnames);
-    #$self->displayResultSet($rsetb);
-    #$self->displayResultSet($rsetc);
+    $self->displayResultSet($rseta, &columnExcludeMap($rseta, @excludenames));
 }
 
 sub showCommand
@@ -739,7 +803,7 @@ sub useCommand
     #set connection to use new database name:
     $self->setJdbcUrl( &setDbNameInUrl($oldurl, $dbname) );
 
-printf STDERR "SET DATABASE TO '%s' jdbcurl='%s'\n", $dbname, $self->getJdbcUrl();
+#printf STDERR "SET DATABASE TO '%s' jdbcurl='%s'\n", $dbname, $self->getJdbcUrl();
 
 #printf STDERR "GET NEW METADATA\n";
     #get metadata for new database:
