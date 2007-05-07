@@ -1,6 +1,24 @@
 %include build_setup.defs
 
 {
+    PL_PACKAGE = $SQLCOLUMN_PACKAGE
+    %include $PL_PACKAGE.defs
+    perl/prlobj.ptpl                 /$PL_PACKAGE.pm
+}
+
+{
+    PL_PACKAGE = $SQLTABLE_PACKAGE
+    %include $PL_PACKAGE.defs
+    perl/prlobj.ptpl                 /$PL_PACKAGE.pm
+}
+
+{
+    PL_PACKAGE = $SQLTABLES_PACKAGE
+    %include $PL_PACKAGE.defs
+    perl/prlobj.ptpl                 /$PL_PACKAGE.pm
+}
+
+{
     #this is sqlpj implementation:
     PL_PACKAGE = $PSQLIMPL_PACKAGE
     %include psqlImpl.defs

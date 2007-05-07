@@ -15,8 +15,10 @@ PL_CONSTRUCTOR_NAME = new
 PL_PKG_IMPORTS := << EOF
 use JDBC;
 use Inline::Java qw(caught);
+use {=SQLTABLES_PACKAGE=};
+use {=SQLTABLE_PACKAGE=};
 EOF
-#%evalmacro PL_PKG_IMPORTS PL_PKG_IMPORTS
+%evalmacro PL_PKG_IMPORTS PL_PKG_IMPORTS
 
 PL_PKG_ATTRIBUTES := << EOF
 my $mPROMPT = $pkgname . "> ";
@@ -40,6 +42,7 @@ PL_OBJ_ATTRIBUTES := << EOF
 'mMetaData'    => undef,
 'mMetaFuncs'    => undef,
 'mDatabaseName' => undef,
+'mSqlTables'    => undef,      #handle to tables object for this connection
 EOF
 #%evalmacro PL_OBJ_ATTRIBUTES PL_OBJ_ATTRIBUTES
 
@@ -66,6 +69,8 @@ PL_ATTRIBUTE_NAME = MetaData
 PL_ATTRIBUTE_NAME = JdbcUrl
 %evalmacro >> getset_methods pl_getset
 PL_ATTRIBUTE_NAME = DatabaseName
+%evalmacro >> getset_methods pl_getset
+PL_ATTRIBUTE_NAME = SqlTables
 %evalmacro >> getset_methods pl_getset
 
 #generate read-only attributes:
@@ -300,8 +305,8 @@ sub sql_init_connection
         return 0;
     }
 
-    #set list of table names:
-    #$self->setTableNames( $self->getConnection()->getMetaData() );
+    #init or re-init our tables object:
+    $self->setSqlTables( new {=SQLTABLES_PACKAGE=}($self->getMetaData(), $self->getDatabaseName()) );
 
     return 1;    #success
 }
@@ -392,12 +397,38 @@ Local commands are:
 
 sub showCreate
 #generate sql to create one or all tables
+#returns non-zero if error
 {
     my ($self, $buf) = @_;
 
+    #create new tables object:
+    my $tables = $self->getSqlTables();
+    my $tbl = undef;
+    my $nerrs = 0;
+
+    #get table name if present:
+    my ($tblname) = $buf;
+
+#printf STDERR "showCreate: tblname='%s'\n", $tblname;
+
     #limit to one table?
+    if ($tblname ne "") {
+        if (!defined($tbl = $tables->tableByName($tblname))) {
+            printf STDERR "%s [showCreate]:  table '%s' not found\n", $pkgname, $tblname;
+            return 1;    #ERROR
+        }
+
+        #otherwise:
+        return $tbl->showCreateSql();
+    }
 
     #otherwise, get list of tables and show create for each table:
+    for $tbl ($tables->allTables()) {
+#printf STDERR "tbl=%s\n", $tbl;
+        $tbl->showCreateSql();
+    }
+
+    return $nerrs;
 }
 
 sub showDataBase

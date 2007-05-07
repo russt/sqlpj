@@ -1,0 +1,209 @@
+#
+#sqltable.defs -  definitions for sqltable object.
+#
+
+#allows us to run stand-alone:
+%ifndef CG_ROOT %include ../build_setup.defs
+
+{ ## header section
+PL_PACKAGE = $SQLTABLE_PACKAGE
+PL_PACKAGE_DESCRIPTION = manange metadata for a single sql table
+
+#not a base class - use standard constuctor name:
+PL_CONSTRUCTOR_NAME = new
+
+PL_PKG_IMPORTS := << EOF
+use {=SQLCOLUMN_PACKAGE=};
+EOF
+%evalmacro PL_PKG_IMPORTS PL_PKG_IMPORTS
+
+PL_PKG_ATTRIBUTES := << EOF
+EOF
+#%evalmacro PL_PKG_ATTRIBUTES PL_PKG_ATTRIBUTES
+}
+{ ## constructor section
+PL_CONSTRUCTOR_BODY := << EOF
+my ($jdbc_metadata, $dbname, $tblname) = @_;
+EOF
+#%evalmacro PL_CONSTRUCTOR_BODY PL_CONSTRUCTOR_BODY
+
+PL_OBJ_ATTRIBUTES := << EOF
+'mMetaData'     => $jdbc_metadata,
+'mDatabaseName' => $dbname,
+'mTableName'    => $tblname,
+'mColumnsByName' => {},             #hash - column objects keyed by column name
+'mAllColumns'    => [],             #array - list of column objects
+'mColumnNames'   => [],             #array - list of column names
+EOF
+#%evalmacro PL_OBJ_ATTRIBUTES PL_OBJ_ATTRIBUTES
+
+#this is for further initialzation of attributes, since hash init cannot be self-referential:
+PL_POST_ATTRIBUTE_INIT := << EOF
+#printf STDERR "%s:  constructing table object for '%s'\n", $pkgname, $self->tableName();
+$self->setTableAttributes();
+EOF
+%evalmacro PL_POST_ATTRIBUTE_INIT PL_POST_ATTRIBUTE_INIT
+}
+
+{ ## class methods
+
+#clear standard accessor accumulator:
+getset_methods =
+
+#generate read/write (get/set) accessors:
+#PL_ATTRIBUTE_NAME = XX
+#%evalmacro >> getset_methods pl_getsetlist
+
+#generate read-only attributes:
+PL_ATTRIBUTE_NAME = MetaData
+%evalmacro >> getset_methods pl_attr_method
+PL_ATTRIBUTE_NAME = DatabaseName
+%evalmacro >> getset_methods pl_attr_method
+PL_ATTRIBUTE_NAME = TableName
+%evalmacro >> getset_methods pl_attr_method
+
+#lists:
+PL_ATTRIBUTE_NAME = AllColumns
+%evalmacro >> getset_methods pl_attrlist_method
+PL_ATTRIBUTE_NAME = ColumnNames
+%evalmacro >> getset_methods pl_attrlist_method
+
+PL_PKG_METHODS := << EOF
+sub setTableAttributes
+#initialize column attributes for our table.
+{
+    my ($self) = @_;
+
+#printf STDERR "tblname='%s' dbname='%s'\n", $tblname, $dbname;
+
+    my $dbMetaData = $self->metaData();
+    my $dbname = $self->databaseName();
+    my $tblname = $self->tableName();
+    my $str = "";
+
+    eval {
+        #######
+        #column info
+        #######
+#'getColumns(String catalog, String schemaPattern, String tableNamePattern, String columnNamePattern)'  => 'ResultSet',
+        my $rset = $dbMetaData->getColumns($dbname, "%", $tblname, "%");
+
+        #######
+        # table atributes:
+        # TABLE_CAT, TABLE_SCHEM, TABLE_NAME, COLUMN_NAME,
+        # DATA_TYPE, TYPE_NAME, COLUMN_SIZE, BUFFER_LENGTH,
+        # DECIMAL_DIGITS, NUM_PREC_RADIX, NULLABLE, REMARKS,
+        # COLUMN_DEF, SQL_DATA_TYPE, SQL_DATETIME_SUB, CHAR_OCTET_LENGTH,
+        # ORDINAL_POSITION, IS_NULLABLE
+        #######
+
+        #for each entry, allocate a new column object:
+        while ($rset->next()) {
+            #note - you have to do the fetch first, which sets wasNull() for the current column.
+            $str = $rset->getString("COLUMN_NAME"); $str = $rset->wasNull() ? "(null)" : $str;
+            my $cname = $str;
+
+            $str = $rset->getString("TYPE_NAME"); $str = $rset->wasNull() ? "(null)" : $str;
+            my $ctype = $str;
+
+            $str = $rset->getString("COLUMN_SIZE"); $str = $rset->wasNull() ? "(null)" : $str;
+            my $csize = $str;
+
+            $str = $rset->getString("NULLABLE"); $str = $rset->wasNull() ? "(null)" : $str;
+            my $cnullable = $str;
+
+            #######
+            #create new column object:
+            #######
+            $self->{'mColumnsByName'}->{$cname} =
+                new {=SQLCOLUMN_PACKAGE=}($tblname, $cname, $ctype, $csize, $cnullable);
+
+            #push column name & reference to column object:
+            push @{$self->{'mColumnNames'}}, $cname;
+            push @{$self->{'mAllColumns'}}, $self->{'mColumnsByName'}->{$cname};
+        }
+
+        ########
+        #primary keys:
+        # TABLE_CAT, TABLE_SCHEM, TABLE_NAME, COLUMN_NAME, KEY_SEQ, PK_NAME
+        ########
+#'getPrimaryKeys(String catalog, String schema, String table)'  => 'ResultSet',
+        #$rsetb = $dbMetaData->getPrimaryKeys($dbname, "%", $tblname);
+
+        #########
+        #Indicies
+        # TABLE_CAT, TABLE_SCHEM, TABLE_NAME, NON_UNIQUE, INDEX_QUALIFIER,
+        # INDEX_NAME, TYPE, ORDINAL_POSITION, COLUMN_NAME, ASC_OR_DESC,
+        # CARDINALITY, PAGES, FILTER_CONDITION
+        #########
+#'getIndexInfo(String catalog, String schema, String table, boolean unique, boolean approximate)'  => 'ResultSet',
+        #$rsetc = $dbMetaData->getIndexInfo($dbname, "%", $tblname, 0, 0);
+    };
+
+    if ($@) {
+        if (caught("java.sql.SQLException")){
+            my $msg = $@->getMessage() ;
+            printf STDERR "%s[tablesCommand]:  Java exception: '%s'\n", $pkgname, $msg;
+        } else {
+            printf STDERR "%s[tablesCommand]:  ERROR: '%s'\n",$pkgname, $@;
+        }
+        return;
+    }
+}
+
+sub showCreateSql
+{
+    my ($self) = @_;
+
+    my $db = $self->databaseName();
+    my $tbl = $self->tableName();
+
+    printf <<"!", $db, $tbl, $db, $tbl;
+DROP TABLE IF EXISTS `%s`.`%s`;
+CREATE TABLE `%s`.`%s` (
+!
+
+    for my $col ($self->allColumns()) {
+        printf "    `%s` %s(%d) %s,\n",
+            $col->columnName(),
+            $col->columnType(),
+            $col->columnSize(),
+            $col->columnIsNullable() ? "NULL" : "NOT NULL",
+            ;
+    }
+
+    print <<"!";
+);
+
+!
+
+}
+
+{=getset_methods=}
+
+EOF
+
+%evalmacro PL_PKG_METHODS PL_PKG_METHODS
+}
+
+#    DROP TABLE IF EXISTS `inftest`.`branch`;
+#    CREATE TABLE `inftest`.`branch` (
+#      `branchid` BIGINT(11) NOT NULL auto_increment,
+#      `reposid` BIGINT(10) NOT NULL DEFAULT 0,
+#      `name` VARCHAR(50) NULL,
+#      `cvsbranchname` VARCHAR(50) NULL,
+#      `noticerelease` VARCHAR(5) NOT NULL DEFAULT '0',
+#      `resistance` VARCHAR(5) NULL,
+#      `activeflag` VARCHAR(5) NULL,
+#      `createdby` VARCHAR(11) NULL,
+#      `createdate` DATETIME NULL,
+#      `updatedby` VARCHAR(11) NULL,
+#      `updatedate` DATETIME NULL,
+#      `productid` BIGINT(10) NULL,
+#      `status` VARCHAR(50) NULL,
+#      `status_url` VARCHAR(100) NULL,
+#      `show_in_in` VARCHAR(2) NULL,
+#      INDEX `branch_idx` (`branchid`, `productid`, `reposid`, `name`(50)),
+#      UNIQUE INDEX `branch_unq_idx` (`productid`, `reposid`, `name`(50))
+#    ) ENGINE = INNODB;
+    
