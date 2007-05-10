@@ -43,6 +43,7 @@ PL_OBJ_ATTRIBUTES := << EOF
 'mMetaFuncs'    => undef,
 'mDatabaseName' => undef,
 'mSqlTables'    => undef,      #handle to tables object for this connection
+'mXmlDisplay'   => 0,          #if true, display result-sets as sql/xml
 EOF
 #%evalmacro PL_OBJ_ATTRIBUTES PL_OBJ_ATTRIBUTES
 
@@ -71,6 +72,8 @@ PL_ATTRIBUTE_NAME = JdbcUrl
 PL_ATTRIBUTE_NAME = DatabaseName
 %evalmacro >> getset_methods pl_getset
 PL_ATTRIBUTE_NAME = SqlTables
+%evalmacro >> getset_methods pl_getset
+PL_ATTRIBUTE_NAME = XmlDisplay
 %evalmacro >> getset_methods pl_getset
 
 #generate read-only attributes:
@@ -170,7 +173,7 @@ sub sql_exec
         #if we have results...
         if ($stmt->execute($sqlbuf)) {
             $results = $stmt->getResultSet();
-            $self->displayResultSet($results);
+            $self->displayResultSet($results, &columnExcludeMap($results, ()));
         } else {
             #no results - see if we have an update count
             $updateCount = $stmt->getUpdateCount();
@@ -195,12 +198,60 @@ sub sql_exec
     return 1;    #success
 }
 
+sub displayXmlResults
+#we get a list of lists as input.  The first row containes the column names.
+#row elements may have undef values, in which case we do not display them
+#(this is the "absent rows" method in the spec).
+{
+    my ($self, $tblname, $rows) = @_;
+
+    $tblname = "UNKNOWN_TABLE" if ($tblname eq "");
+
+    my $ii = 0;
+    my $nrows = $#{$rows};
+
+    my $indentlevel = 0;
+    my $indentstr = " " x 2;
+    my $indent = $indentstr x $indentlevel;
+
+    printf "%s<%s>\n", $indent, $tblname;
+    $indentlevel++; $indent = $indentstr x $indentlevel;
+
+    #first row is the column names:
+    my $rref = $$rows[$ii++];
+    my (@headers) = @$rref;
+
+#printf STDERR "nrows=%d headers=(%s)\n", $nrows, join(',', @headers);
+
+    #foreach row of data:
+    for ($ii = $ii; $ii <= $nrows; $ii++) {
+
+        printf "%s<row>\n", $indent;
+        $indentlevel++; $indent = $indentstr x $indentlevel;
+
+        $rref = $$rows[$ii];
+        #foreach column in the row:
+        for (my $jj = 0; $jj <= $#$rref; $jj++) {
+            #display the row unless it was SQL NULL:
+            if (defined($$rref[$jj])) {
+                printf "%s</%s>%s</%s>\n", $indent, $headers[$jj], $$rref[$jj], $headers[$jj];
+            }
+        }
+
+        $indentlevel--; $indent = $indentstr x $indentlevel;
+        printf "%s</row>\n", $indent;
+    }
+
+    $indentlevel--; $indent = $indentstr x $indentlevel;
+    printf "%s</%s>\n", $indent, $tblname;
+}
+
 sub displayResultSet
 # display resultSet <rset>
 {
     my ($self, $rset, @colmap) = @_;
 
-    return "(null)" unless defined($rset);
+    return 0 unless defined($rset);
 
     #we first make a pass to get all the rows into memory:
     my @allrows = ();
@@ -208,9 +259,18 @@ sub displayResultSet
     #save column headers:
     push @allrows, [&getColumns($rset, @colmap)];
 
+    my $tableName = &getTableName($rset);
+
     #save data rows:
     while ($rset->next()) {
-        push @allrows, [&getRow($rset, @colmap)];
+        push @allrows, [&getRow($rset, $self->getXmlDisplay(), @colmap)];
+    }
+
+    ########
+    #XML/SQL if set:
+    ########
+    if ($self->getXmlDisplay()) {
+        return $self->displayXmlResults($tableName, \@allrows);
     }
 
     #next, we iterate through the rows to set the max column size:
@@ -355,6 +415,9 @@ sub localCommand
     if ($buf =~ /^help/i) {
         $buf =~ s/help\s*//i;
         $self->helpCommand($buf);
+    } elsif ($buf  =~ /^set/i) {
+        $buf =~ s/set\s*//i;
+        $self->setCommand($buf);
     } elsif ($buf  =~ /^use/i) {
         $buf =~ s/use\s*//i;
         $self->useCommand($buf);
@@ -363,10 +426,10 @@ sub localCommand
         $self->showCommand($buf);
     } elsif ($buf  =~ /^tables/i) {
         $buf =~ s/tables\s*//i;
-        $self->tablesCommand($buf);
+        $self->showTablesCommand($buf);
     } elsif ($buf  =~ /^table/i) {
         $buf =~ s/table\s*//i;
-        $self->tableCommand($buf);
+        $self->showTableCommand($buf);
     } else {
         return 0;    #not a local command
     }
@@ -380,19 +443,88 @@ sub helpCommand
 
     print <<"!";
 Local commands are:
- help                - show this message
+ help [command]       - show this message, or help about specific <command>.
 
- tables [db]         - show information about tables in <db>, defaults to connection db.
- tables name [db]    - show information about table <name> in <db>, defaults to connection db.
+ set xml [on]         - output result-sets in sql/xml form.
+ set xml off          - turn off xml output of result-sets.
 
- show conn[ection]   - show jdbc connection properties, including product & version
- show create [table] - generate sql to create all tables, or a single table.
- show db             - show db name
- show metadata       - show jdbc metadata (long)
+ show tables [db]     - show information about tables in <db>, defaults to connection db.
+ show table name [db] - show information about table <name> in <db>, defaults to connection db.
+
+ show conn[ection]    - show jdbc connection properties, including product & version
+ show create [table]  - generate sql to create all tables, or a single table.
+ show db              - show db name
+ show metadata        - show jdbc metadata (long)
 
  dump [table] [filename]
-                     - dump all or named table to stdout or <filename>
+                      - dump all or named table to stdout or <filename>
 !
+}
+
+sub showCommand
+#show meta-info about the database and/or tables
+#return 1 if we have a show command.
+{
+    my ($self, $buf) = @_;
+
+    #trim buf:
+    $buf =~ s/^\s+//;
+    $buf =~ s/[;\s]*$//;
+
+    if ($buf =~ /^conn/i) {
+        $buf =~ s/conn[^\s]*\s*//i;
+        $self->showConnection($buf);
+    } elsif ($buf  =~ /^tables/i) {
+        $buf =~ s/tables\s*//i;
+        $self->showTablesCommand($buf);
+    } elsif ($buf  =~ /^table/i) {
+        $buf =~ s/table\s*//i;
+        $self->showTableCommand($buf);
+    } elsif ($buf  =~ /^create/i) {
+        $buf =~ s/create\s*//i;
+        $self->showCreate($buf);
+    } elsif ($buf  =~ /^db/i) {
+        $buf =~ s/db\s*//i;
+        $self->showDataBase($buf);
+    } elsif ($buf  =~ /^meta/i) {
+        $buf =~ s/meta[^\s]*\s*//i;
+        $self->showMetaData($buf);
+    } else {
+        return 0;    #not a local command
+    }
+
+    return 1;    #we found and executed a local command
+}
+
+sub setCommand
+#set display or other options for the cli.
+#returns non-zero if error
+{
+    my ($self, $buf) = @_;
+
+    if ($buf =~ /^xml/i) {
+        $buf =~ s/xml\s*//i;
+        my $howsay = "remains";
+        if ($buf eq "" || $buf =~ /^on/i) {
+            if (!$self->getXmlDisplay()) {
+                $self->setXmlDisplay(1);
+                $howsay = "is now";
+            }
+        } elsif ($buf =~ /^off/i) {
+            if ($self->getXmlDisplay()) {
+                $self->setXmlDisplay(0);
+                $howsay = "is now";
+            }
+        } else {
+            printf STDERR "%s: ERROR: set xml '%s' not recognized - ignored.\n", $pkgname, $buf;
+        }
+        printf STDOUT "SQL/XML result-sets display %s %s\n",
+            $howsay, $self->getXmlDisplay()? "ON" : "OFF";
+    } else {
+        printf STDERR "%s: ERROR: set '%s' not recognized - ignored.\n", $pkgname, $buf;
+    }
+
+    return 1;    #we found and processed a set command
 }
 
 sub showCreate
@@ -439,7 +571,7 @@ sub showDataBase
     $self->sql_exec("select DATABASE()");
 }
 
-sub tableCommand
+sub showTableCommand
 #implement the table command, which shows information about a single table
 #Usage:  table table_name
 {
@@ -531,9 +663,9 @@ sub tableCommand
     if ($@) {
         if (caught("java.sql.SQLException")){
             my $msg = $@->getMessage() ;
-            printf STDERR "%s[tablesCommand]:  Java exception: '%s'\n", $pkgname, $msg;
+            printf STDERR "%s[showTablesCommand]:  Java exception: '%s'\n", $pkgname, $msg;
         } else {
-            printf STDERR "%s[tablesCommand]:  ERROR: '%s'\n",$pkgname, $@;
+            printf STDERR "%s[showTablesCommand]:  ERROR: '%s'\n",$pkgname, $@;
         }
         return;
     }
@@ -543,7 +675,7 @@ sub tableCommand
     $self->displayResultSet($rsetc, &columnExcludeMap($rsetc, @excludenamesc));
 }
 
-sub tablesCommand
+sub showTablesCommand
 #implement the tables command, which shows information about tables
 {
     my ($self, $dbname) = @_;
@@ -572,44 +704,14 @@ sub tablesCommand
     if ($@) {
         if (caught("java.sql.SQLException")){
             my $msg = $@->getMessage() ;
-            printf STDERR "%s[tablesCommand]:  Java exception: '%s'\n", $pkgname, $msg;
+            printf STDERR "%s[showTablesCommand]:  Java exception: '%s'\n", $pkgname, $msg;
         } else {
-            printf STDERR "%s[tablesCommand]:  ERROR: '%s'\n",$pkgname, $@;
+            printf STDERR "%s[showTablesCommand]:  ERROR: '%s'\n",$pkgname, $@;
         }
         return;
     }
 
     $self->displayResultSet($rseta, &columnExcludeMap($rseta, @excludenames));
-}
-
-sub showCommand
-#show meta-info about the database and/or tables
-{
-    my ($self, $buf) = @_;
-
-    #trim buf:
-    $buf =~ s/^\s+//;
-    $buf =~ s/[;\s]*$//;
-
-# show conn[ection]   - show jdbc connection properties, including product & version
-# show create [table] - generate sql to create all tables, or a single table.
-# show db             - show db name
-# show metadata       - show jdbc metadata (long)
-    if ($buf =~ /^conn/i) {
-        $buf =~ s/conn.*\s*//i;
-        $self->showConnection($buf);
-    } elsif ($buf  =~ /^create/i) {
-        $buf =~ s/create\s*//i;
-        $self->showCreate($buf);
-    } elsif ($buf  =~ /^db/i) {
-        $buf =~ s/db\s*//i;
-        $self->showDataBase($buf);
-    } elsif ($buf  =~ /^meta/i) {
-        $buf =~ s/meta.*\s*//i;
-        $self->showMetaData($buf);
-    } else {
-        return 0;    #not a local command
-    }
 }
 
 sub useCommand
@@ -732,7 +834,7 @@ sub callMetaFunc
     } elsif ($type eq "ResultSet") {
         # dump the result:
         printf "\n%s:\n", $func;
-        $self->displayResultSet($val);
+        $self->displayResultSet($val, &columnExcludeMap($val, () ));
         return;
     } elsif ($type eq "Connection") {
         ;
@@ -840,6 +942,37 @@ sub getColumns
     return @header;
 }
 
+sub getTableName
+#return the table name of a rowset.
+{
+    my ($rset) = @_;
+
+    return () unless defined($rset);
+
+    my $tableName = "";
+
+    eval {
+        my $m        = $rset->getMetaData();
+#        my $colcnt   = $m->getColumnCount();
+#printf STDERR "getTableName getColumnCount()=%d\n", $colcnt;
+
+        #this gets the table name of a particular column (1..N), so we ask for column 1:
+        $tableName   = $m->getTableName(1);
+    };
+
+    if ($@) {
+        if (caught("java.sql.SQLException")){
+            my $msg = $@->getMessage() ;
+            printf STDERR "%s[getTableName]:  Java exception: '%s'\n", $pkgname, $msg;
+        } else {
+            printf STDERR "%s[getTableName]:  ERROR: '%s'\n",$pkgname, $@;
+        }
+        return "";
+    }
+
+    return $tableName;
+}
+
 sub getColumnSizes
 #return the list of column display sizes for a result set
 #if <colmap> is set, then collect for the named columns.
@@ -876,7 +1009,7 @@ sub getRow
 #return the list of row values for the current row of <rset>.
 #if <colmap> is set, then only retrieve the named columns.
 {
-    my ($rset, @colmap) = @_;
+    my ($rset, $xmldisplay, @colmap) = @_;
 
     return () unless defined($rset);
 
@@ -891,8 +1024,15 @@ sub getRow
 
             #note - you have to do the fetch first, which sets wasNull() for the current column.
             my $str = $rset->getString($ii);
-            $str = $rset->wasNull() ? "(null)" : $str;
-            push @data, $str;
+
+            #if we are displaying xml rowsets...
+            if ($xmldisplay) {
+                #...then set SQL NULL elements to undef:
+                push @data, ($rset->wasNull() ? undef : $str);
+            } else {
+                #otherwise, we will display the string "(NULL)":
+                push @data, ($rset->wasNull() ? "(NULL)" : $str);
+            }
         }
     };
 

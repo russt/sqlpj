@@ -26,10 +26,13 @@ EOF
 PL_MAIN := << EOF
 # Generic jdbc script runner.
 
-$JDBC_URL      = "{=OJCBUILDS_URL=}";
 $JDBC_URL      = "{=MOJAVE_AK_URL=}";
 $USER          = "{=MOJAVE_AK_USER=}";
 $PASSWORD      = "{=MOJAVE_AK_PASSWD=}";
+
+$JDBC_URL      = "{=MOJAVE_INF_URL=}";
+$USER          = "{=MOJAVE_INF_USER=}";
+$PASSWORD      = "{=MOJAVE_INF_PASSWD=}";
 
 my $psqlImpl = new {=PSQLIMPL_PACKAGE=} ($JDBC_URL, $DRIVER_CLASS, $USER, $PASSWORD, $PROMPT);
 
