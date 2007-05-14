@@ -412,32 +412,33 @@ sub localCommand
     $buf =~ s/^\s+//;
     $buf =~ s/[;\s]*$//;
 
+    my $handled = 0;
+
     if ($buf =~ /^help/i) {
         $buf =~ s/help\s*//i;
-        $self->helpCommand($buf);
+        $handled = $self->helpCommand($buf);
     } elsif ($buf  =~ /^set/i) {
         $buf =~ s/set\s*//i;
-        $self->setCommand($buf);
+        $handled = $self->setCommand($buf);
     } elsif ($buf  =~ /^use/i) {
         $buf =~ s/use\s*//i;
-        $self->useCommand($buf);
+        $handled = $self->useCommand($buf);
     } elsif ($buf  =~ /^show/i) {
         $buf =~ s/show\s*//i;
-        $self->showCommand($buf);
+        $handled = $self->showCommand($buf);
     } elsif ($buf  =~ /^tables/i) {
         $buf =~ s/tables\s*//i;
-        $self->showTablesCommand($buf);
+        $handled = $self->showTablesCommand($buf);
     } elsif ($buf  =~ /^table/i) {
         $buf =~ s/table\s*//i;
-        $self->showTableCommand($buf);
-    } else {
-        return 0;    #not a local command
+        $handled = $self->showTableCommand($buf);
     }
 
-    return 1;    #we found and processed a local command
+    return $handled;
 }
 
 sub helpCommand
+#return 1 if we handled the command, otherwise 0.
 {
     my ($self, $args) = @_;
 
@@ -448,8 +449,11 @@ Local commands are:
  set xml [on]         - output result-sets in sql/xml form.
  set xml off          - turn off xml output of result-sets.
 
- show tables [db]     - show information about tables in <db>, defaults to connection db.
- show table name [db] - show information about table <name> in <db>, defaults to connection db.
+ tables [db]          - show information about tables in <db>, defaults to connection db.
+                        (similar to "show tables" in mysql).
+ table name [db]      - show information about table <name> in <db>, defaults to connection db.
+                        (can also use "decribe <table>" in mysql & oracle).
+                        (can also use "show columns from <table>" in mysql).
 
  show conn[ection]    - show jdbc connection properties, including product & version
  show create [table]  - generate sql to create all tables, or a single table.
@@ -459,11 +463,13 @@ Local commands are:
  dump [table] [filename]
                       - dump all or named table to stdout or <filename>
 !
+
+    return 1;    #we processed the help command.
 }
 
 sub showCommand
 #show meta-info about the database and/or tables
-#return 1 if we have a show command.
+#return 1 if we handled the command, otherwise 0.
 {
     my ($self, $buf) = @_;
 
@@ -474,12 +480,6 @@ sub showCommand
     if ($buf =~ /^conn/i) {
         $buf =~ s/conn[^\s]*\s*//i;
         $self->showConnection($buf);
-    } elsif ($buf  =~ /^tables/i) {
-        $buf =~ s/tables\s*//i;
-        $self->showTablesCommand($buf);
-    } elsif ($buf  =~ /^table/i) {
-        $buf =~ s/table\s*//i;
-        $self->showTableCommand($buf);
     } elsif ($buf  =~ /^create/i) {
         $buf =~ s/create\s*//i;
         $self->showCreate($buf);
@@ -493,12 +493,12 @@ sub showCommand
         return 0;    #not a local command
     }
 
-    return 1;    #we found and executed a local command
+    return 1;    #we processed the show command locally.
 }
 
 sub setCommand
 #set display or other options for the cli.
-#returns non-zero if error
+#return 1 if we handled the command, otherwise 0.
 {
     my ($self, $buf) = @_;
 
@@ -529,7 +529,7 @@ sub setCommand
 
 sub showCreate
 #generate sql to create one or all tables
-#returns non-zero if error
+#returns non-zero if error (called to process show create).
 {
     my ($self, $buf) = @_;
 
