@@ -2,39 +2,91 @@
 
 # psql.pl - prlskel program derived from template: perl/prlskel.ptpl
 
+{
+PL_USAGE := << EOF
+Usage:  $pkgname [options] [file ...]
+
+SYNOPSIS
+  Creates a new database connection and runs each
+  sql file provided on the command line.  If no files
+  are given, then prompts for sql statements on stdin.
+
+  Sql statements will be executed when the input contains
+  a ';' command delimiter.  The delimiter must
+  appear at the end of the line or alone on a line.
+
+OPTIONS
+  -help             Display this help message.
+  -V                Show the $pkgname version.
+  -verbose          Display additional informational messages.
+  -debug            Display debug messages.
+  -ddebug           Display deep debug messages.
+  -quiet            Display severe errors only.
+
+  -props file       A java property file containing the JDBC connection parameters:
+                    The following property keys are recognized:
+
+                        JDBC_CLASSPATH, JDBC_DRIVER_CLASS,
+                        JDBC_URL, JDBC_USER, JDBC_PASSWORD
+
+  -classpath string Classpath containing the JDBC driver (can be a single jar).
+  -driver classname Name of the driver class
+  -url name         Jdbc connection url
+  -user name        Username used for connection
+  -password string  Password for this user
+  -prompt string    Use <string> as prompt instead of default.
+
+ENVIRONMENT
+ CLASSPATH      Java CLASSPATH, inherited by JDBC.pm
+
+EXAMPLES
+  $pkgname -url jdbc:mysql://localhost:3306/mysql -user root -password secret -classpath mysqljdbc.jar -driver com.mysql.jdbc.Driver
+
+  Similar example, with connection properties in "localmysql.props",
+  and reading commands from "myscript.sql":
+
+  % cat localmysql.props
+JDBC_CLASSPATH=mysqljdbc.jar
+JDBC_DRIVER_CLASS=com.mysql.jdbc.Driver
+JDBC_URL=jdbc:mysql://localhost:3306/mysql
+JDBC_USER=root
+JDBC_PASSWORD=secret
+
+  $pkgname -props localmysql.props -prompt "" myscript.sql
+EOF
+
+%evalmacro PL_USAGE PL_USAGE
+}
+
 { ### psql defs
 %ifndef PL_PACKAGE       PL_PACKAGE = $TESTDBI_PACKAGE
 PL_PACKAGE_DESCRIPTION = test the perl dbi, jdbc interfaces
 
-PL_PKG_IMPORTS = << EOF
-use $PSQLIMPL_PACKAGE;
+PL_PKG_IMPORTS := << EOF
+use Config;
+use {=PKGCONFIG_PACKAGE=};
 EOF
+%evalmacro PL_PKG_IMPORTS PL_PKG_IMPORTS
 
 PL_PKG_ATTRIBUTES := << EOF
-my $DRIVER_CLASS  = "{=MYSQLDRV=}";
-my $JDBC_URL      = "{=MOJAVE_INF_URL=}";
-my $USER          = "{=MOJAVE_INF_USER=}";
-my $PASSWORD      = "{=MOJAVE_INF_PASSWD=}";
 my $USE_STDIN = 1;
 my @SQLFILES = ();
-my $PROMPT = "sqlpj> ";
+my $scfg = new {=PKGCONFIG_PACKAGE=}();
 EOF
 %evalmacro PL_PKG_ATTRIBUTES PL_PKG_ATTRIBUTES
 }
 
 {
 PL_MAIN := << EOF
-# Generic jdbc script runner.
 
-$JDBC_URL      = "{=MOJAVE_AK_URL=}";
-$USER          = "{=MOJAVE_AK_USER=}";
-$PASSWORD      = "{=MOJAVE_AK_PASSWD=}";
+#note - this pulls in JDBC.  we use require so we can set our CLASSPATH
+#before loading the inline java packages:
+require "{=PSQLIMPL_PACKAGE=}.pm";
 
-$JDBC_URL      = "{=MOJAVE_INF_URL=}";
-$USER          = "{=MOJAVE_INF_USER=}";
-$PASSWORD      = "{=MOJAVE_INF_PASSWD=}";
-
-my $psqlImpl = new {=PSQLIMPL_PACKAGE=} ($JDBC_URL, $DRIVER_CLASS, $USER, $PASSWORD, $PROMPT);
+#######
+#create implementation class, passing in our configuration:
+#######
+my $psqlImpl = new {=PSQLIMPL_PACKAGE=}($scfg);
 
 #initialize our driver class:
 if (!$psqlImpl->check_driver()) {
@@ -44,81 +96,137 @@ if (!$psqlImpl->check_driver()) {
 }
 
 if ($USE_STDIN) {
-    printf STDERR "%s:  using stdin\n", $pkgname;
+#printf STDERR "%s:  using stdin\n", $pkgname;
     my $stdinh = "STDIN";
     $psqlImpl->sqlsession($stdinh, "<STDIN>");
 } else {
     my $infile;
     for (my $ii = 0; $ii <= $#SQLFILES; $ii++) {
         if (open($infile, $SQLFILES[$ii])) {
-            $psqlImpl->sqlsession(\$infile, $SQLFILES[$ii]);
+            $psqlImpl->sqlsession($infile, $SQLFILES[$ii]);
             close $infile;
         } else {
             printf STDERR "%s:  ERROR: cannot open sql input, '%s':  '%s'\n", $pkgname, $SQLFILES[$ii], $!;
         }
     }
 }
-
-return 0;
-
 EOF
 %evalmacro PL_MAIN PL_MAIN
 }
 
 { #subroutines
 PL_PKG_METHODS := << EOF
+sub checkSetClasspath
+#if we have a classpath setting, then add to the environemnt.
+#
+#NOTE:  inline java will ignore any new CLASSPATH setting after
+#       the module is loaded.  A work-around is to use "require" to load it.
+{
+    my ($cfg) = @_;
+
+#printf STDERR "BEFORE CLASSPATH='%s'\n", $ENV{'CLASSPATH'};
+    if (defined($cfg->getJdbcClassPath())) {
+        if (defined($ENV{'CLASSPATH'}) && $ENV{'CLASSPATH'} ne "") {
+            $ENV{'CLASSPATH'} = sprintf("%s%s%s", $cfg->getJdbcClassPath(), $cfg->getPathSeparator(), $ENV{'CLASSPATH'});
+        } else {
+            $ENV{'CLASSPATH'} = $cfg->getJdbcClassPath();
+        }
+    }
+#printf STDERR "AFTER CLASSPATH='%s'\n", $ENV{'CLASSPATH'};
+}
 EOF
 }
 
 {
 PL_PARSE_ARGS_PRE := << EOF
+#set defaults:
+$scfg->setProgName($p);
+$scfg->setPrompt("sqlpj> ");
+$scfg->setPathSeparator($Config{path_sep});
 EOF
 %evalmacro PL_PARSE_ARGS_PRE PL_PARSE_ARGS_PRE
+
 {
 { #balance braces
 PL_PARSE_ARGS_LOOP := << EOF
+} elsif ($flag =~ '^-V') {
+    # -V                show version and exit
+    printf STDOUT "%s, Version %s, %s.\n",
+        $scfg->getProgName(), $scfg->versionNumber(), $scfg->versionDate();
+    $HELPFLAG = 1;    #display version and exit.
+    return 0;
+} elsif ($flag =~ '^-user') {
+    # -user name        Username used for connection
+    if ($#ARGV+1 > 0 && $ARGV[0] !~ /^-/) {
+        $scfg->setJdbcUser(shift(@ARGV));
+    } else {
+        printf STDERR "%s:  -user requires user name.\n", $p;
+        return 1;
+    }
+} elsif ($flag =~ '^-pass') {
+    # -password string  Password for this user
+    if ($#ARGV+1 > 0 && $ARGV[0] !~ /^-/) {
+        $scfg->setJdbcPassword(shift(@ARGV));
+    } else {
+        printf STDERR "%s:  -password requires password string.\n", $p;
+        return 1;
+    }
+} elsif ($flag =~ '^-driver') {
+    # -driver classname Name of the driver class
+    if ($#ARGV+1 > 0 && $ARGV[0] !~ /^-/) {
+        $scfg->setJdbcDriverClass(shift(@ARGV));
+    } else {
+        printf STDERR "%s:  -driver requires driver class name.\n", $p;
+        return 1;
+    }
+} elsif ($flag =~ '^-classpath') {
+    # -classpath string Classpath containing the JDBC driver (can be a single jar).
+    if ($#ARGV+1 > 0 && $ARGV[0] !~ /^-/) {
+        $scfg->setJdbcClassPath(shift(@ARGV));
+    } else {
+        printf STDERR "%s:  -classpath requires classpath setting.\n", $p;
+        return 1;
+    }
+} elsif ($flag =~ '^-props') {
+    # -props <file>        Set JDBC connection properties from <file>
+    if ($#ARGV+1 > 0 && $ARGV[0] !~ /^-/) {
+        $scfg->setJdbcPropsFileName(shift(@ARGV));
+        #parse the properties file - additional command line args can override:
+        $scfg->parseJdbcPropertiesFile();
+    } else {
+        printf STDERR "%s:  -props requires a file name containing JDBC connection properties.\n", $p;
+        return 1;
+    }
+} elsif ($flag =~ '^-url') {
+    # -url name         Jdbc connection url
+    if ($#ARGV+1 > 0 && $ARGV[0] !~ /^-/) {
+        $scfg->setJdbcUrl(shift(@ARGV));
+    } else {
+        printf STDERR "%s:  -url requires the JDBC connection url\n", $p;
+        return 1;
+    }
+} elsif ($flag =~ '^-prompt') {
+    # -prompt string    Use <string> as prompt instead of default.
+    if ($#ARGV+1 > 0 && $ARGV[0] !~ /^-/) {
+        $scfg->setPrompt(shift(@ARGV));
+    } else {
+        printf STDERR "%s:  -prompt requires the prompt string.\n", $p;
+        return 1;
+    }
 EOF
 } #balance braces
 } #end of parse arg loop defs
 
 PL_PARSE_ARGS_POST := << EOF
+#add to the CLASSPATH if required:
+&checkSetClasspath($scfg);
+
+#do we have file args?
+#take remaining args as directories to walk:
+if ($#ARGV >= 0) {
+    @SQLFILES = @ARGV;
+    $USE_STDIN = 0;
+}
 EOF
 } #end of parse arg defs
-
-{
-PL_USAGE := << EOF
-Usage:  $pkgname [options] [file ...]
-
-SYNOPSIS
-  Creates a new database connection and runs each
-  sql file provided on the command line.  If none
-  present, then prompts for sql statements on stdin.
-
-  Sql statements will be executed when the input contains a
-  'go' or ';' command delimiter. These delimiters must
-  appear at the end of the line or alone on a line. If no
-  delimiters are provided, then statements are executed on EOF.
-
-OPTIONS
-  -help             Display this help message.
-  -verbose          Display additional informational messages.
-  -debug            Display debug messages.
-  -ddebug           Display deep debug messages.
-  -quiet            Display severe errors only.
-  -prompt string    Use <string> as prompt instead of default.
-  -user name        Username used for connection
-  -password string  Password for this user
-  -driver classname Name of the driver class
-  -url name         Jdbc connection url
-
-ENVIRONMENT
- CLASSPATH      you must have the database jdbc driver in your classpath
-
-EXAMPLE
-  $pkgname -url jdbc:oracle:thin:\@pipit.sfbay.sun.com:1521:FORTE \\
-     -driver oracle.jdbc.driver.OracleDriver -user system -password manager foo.sql
-EOF
-
-%evalmacro PL_USAGE PL_USAGE
-}
 

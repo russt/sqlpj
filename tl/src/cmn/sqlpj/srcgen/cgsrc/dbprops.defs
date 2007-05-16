@@ -1,0 +1,46 @@
+#
+#dbprops.defs - connection properties for my test databases
+#
+
+%ifndef JDBC_CLASSLIB %eecho ERROR: JDBC_CLASSLIB must be defined - ABORT
+%ifndef JDBC_CLASSLIB %halt 1
+
+MYSQL_CLASSPATH    = $JDBC_CLASSLIB/mysqljdbc.jar
+ORA_CLASSPATH      = $JDBC_CLASSLIB/ojdbc14.jar
+
+ORADRV             = oracle.jdbc.driver.OracleDriver
+INF_CENTRAL_URL    = jdbc:oracle:thin:@oraprddb2.central:1522:COMDB8
+INF_CENTRAL_USER   = jws_re
+INF_CENTRAL_PASSWD = changeme
+
+MYSQLDRV           = com.mysql.jdbc.Driver
+MOJAVE_BASE_URL    = jdbc:mysql://mojave:3306
+MOJAVE_INFTEST_URL = $MOJAVE_BASE_URL/inftest
+MOJAVE_INF_URL     = $MOJAVE_BASE_URL/inf
+MOJAVE_INF_USER    = inf
+MOJAVE_INF_PASSWD = changeme
+
+
+OJCBUILDS_BASE_URL= jdbc:mysql://ojcbuilds.stc.com:3306
+OJCBUILDS_URL     = $OJCBUILDS_BASE_URL/alaska_reports
+OJCBUILDS_USER    = abuilds
+OJCBUILDS_PASSWD  = abuilds
+#        <property name="database.baseURL" value="jdbc:mysql://amanka:3306" />
+#        <property name="database.driver" value="com.mysql.jdbc.Driver" />
+#        <property name="database.name" value="alaska_reports" />
+#        <property name="database.user" value="abuilds" />
+#        <property name="database.password" value="abuilds" />
+
+MOJAVE_AK_URL     = $MOJAVE_BASE_URL/alaska_reports
+MOJAVE_AK_USER    = inf
+MOJAVE_AK_PASSWD  = changeme
+
+#JDBC_SERVER_HOST = localhost
+#JDBC_SERVER_PORT = 33060
+#colon-separated list of driver names. See the standard Javadoc
+#JDBC_DRIVER_LIST = ${ORADRV}:${MYSQLDRV}
+
+#example connection string:
+#    "dbi:JDBC:hostname=$hostname;port=$port;url=$url", $user, $password
+# "dbi:JDBC:hostname={=JDBC_SERVER_HOST=};port={=JDBC_SERVER_PORT=};url={=MOJAVE_INF_URL=}",
+#     "{=MOJAVE_INF_USER=}", "{=MOJAVE_INF_PASSWD=}"

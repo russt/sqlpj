@@ -1,4 +1,6 @@
 %include build_setup.defs
+#please remove this dependency after pkgconfig object is finished:
+%include dbprops.defs
 
 {
     PL_PACKAGE = $SQLCOLUMN_PACKAGE
@@ -19,6 +21,13 @@
 }
 
 {
+    #configuration parameters:
+    PL_PACKAGE = $PKGCONFIG_PACKAGE
+    %include $PL_PACKAGE.defs
+    perl/prlobj.ptpl                 /$PL_PACKAGE.pm
+}
+
+{
     #this is sqlpj implementation:
     PL_PACKAGE = $PSQLIMPL_PACKAGE
     %include psqlImpl.defs
@@ -31,6 +40,9 @@
     %include psql.defs
     perl/prlskel.ptpl                 /$PL_PACKAGE.pl
 }
+
+#generate configuration properties for various database instances:
+%include dbprops.cg
 
 #check for undefs:
 %shell egrep "{=|:undef" `walkdir -f -l 0 $CG_ROOT`

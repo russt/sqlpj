@@ -28,22 +28,24 @@ EOF
 
 { ## constructor section
 PL_CONSTRUCTOR_BODY := << EOF
-my ($url, $driver ,$user, $password, $prompt) = @_;
+my ($cfg) = @_;
 EOF
 #%evalmacro PL_CONSTRUCTOR_BODY PL_CONSTRUCTOR_BODY
 
 PL_OBJ_ATTRIBUTES := << EOF
-'mJdbcDriver'  => $driver,
-'mJdbcUrl'     => $url,
-'mUser'        => $user,
-'mPassword'    => $password,
-'mPrompt'      => $prompt,
+'mJdbcClassPath'  => $cfg->getJdbcClassPath(),
+'mJdbcDriver'  => $cfg->getJdbcDriverClass(),
+'mJdbcUrl'     => $cfg->getJdbcUrl(),
+'mUser'        => $cfg->getJdbcUser(),
+'mPassword'    => $cfg->getJdbcPassword(),
+'mPrompt'      => $cfg->getPrompt(),
 'mConnection'  => undef,
 'mMetaData'    => undef,
 'mMetaFuncs'    => undef,
 'mDatabaseName' => undef,
 'mSqlTables'    => undef,      #handle to tables object for this connection
 'mXmlDisplay'   => 0,          #if true, display result-sets as sql/xml
+'mPathSeparator' => $cfg->getPathSeparator(),
 EOF
 #%evalmacro PL_OBJ_ATTRIBUTES PL_OBJ_ATTRIBUTES
 
@@ -77,11 +79,15 @@ PL_ATTRIBUTE_NAME = XmlDisplay
 %evalmacro >> getset_methods pl_getset
 
 #generate read-only attributes:
+PL_ATTRIBUTE_NAME = JdbcClassPath
+%evalmacro >> getset_methods pl_attr_method
 PL_ATTRIBUTE_NAME = JdbcDriver
 %evalmacro >> getset_methods pl_attr_method
 PL_ATTRIBUTE_NAME = User
 %evalmacro >> getset_methods pl_attr_method
 PL_ATTRIBUTE_NAME = Password
+%evalmacro >> getset_methods pl_attr_method
+PL_ATTRIBUTE_NAME = PathSeparator
 %evalmacro >> getset_methods pl_attr_method
 PL_ATTRIBUTE_NAME = Prompt
 %evalmacro >> getset_methods pl_attr_method
@@ -103,7 +109,8 @@ sub sqlsession
 {
     my ($self, $aFh, $fn) = @_;
 
-    printf STDERR "%s[sqlsession]: reading from file '%s'\n", $pkgname, $fn;
+#printf STDERR "%s[sqlsession]: reading from file '%s'\n", $pkgname, $fn;
+#printf STDERR "%s[sqlsession]: aFh is a '%s'\n", $pkgname, ref($aFh);
 
     if (!$self->sql_init_connection()) {
         printf STDERR "%s:[sqlsession]:  cannot get a database connection:  ABORT\n", $pkgname;
@@ -444,7 +451,7 @@ sub helpCommand
 
     print <<"!";
 Local commands are:
- help [command]       - show this message, or help about specific <command>.
+ help                 - show this message.
 
  set xml [on]         - output result-sets in sql/xml form.
  set xml off          - turn off xml output of result-sets.
@@ -452,17 +459,20 @@ Local commands are:
  tables [db]          - show information about tables in <db>, defaults to connection db.
                         (similar to "show tables" in mysql).
  table name [db]      - show information about table <name> in <db>, defaults to connection db.
-                        (can also use "decribe <table>" in mysql & oracle).
+                        (can also use "describe <table>" in mysql & oracle).
                         (can also use "show columns from <table>" in mysql).
 
  show conn[ection]    - show jdbc connection properties, including product & version
  show create [table]  - generate sql to create all tables, or a single table.
  show db              - show db name
  show metadata        - show jdbc metadata (long)
-
- dump [table] [filename]
-                      - dump all or named table to stdout or <filename>
 !
+
+
+#not yet implemented:
+#help [command]       - show this message, or help about specific <command>.
+#dump [table] [filename]
+#                     - dump all or named table to stdout or <filename>
 
     return 1;    #we processed the help command.
 }
@@ -1094,7 +1104,6 @@ sub setDbNameInUrl
 
     return undef;
 }
-
 EOF
 
 %evalmacro PL_PKG_METHODS PL_PKG_METHODS

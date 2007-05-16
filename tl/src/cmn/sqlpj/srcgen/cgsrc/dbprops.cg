@@ -1,0 +1,68 @@
+#
+#dbprops.cg - generate connection property files for all of our test instances
+#
+
+%include build_setup.defs
+%include dbprops.defs
+
+dbprop_template := << EOF
+JDBC_CLASSPATH={=JDBC_CLASSPATH=}
+JDBC_DRIVER_CLASS={=JDBC_DRIVER_CLASS=}
+JDBC_URL={=JDBC_URL=}
+JDBC_USER={=JDBC_USER=}
+JDBC_PASSWORD={=JDBC_PASSWORD=}
+EOF
+
+#######
+#oracle setups:
+#######
+JDBC_CLASSPATH =	$ORA_CLASSPATH
+JDBC_DRIVER_CLASS =	$ORADRV
+
+JDBC_URL =	$INF_CENTRAL_URL
+JDBC_USER =	$INF_CENTRAL_USER
+JDBC_PASSWORD =	$INF_CENTRAL_PASSWD
+%evalmacro ECHO_TXT dbprop_template
+echo	/infcentral.props
+
+######
+#mysql setups:
+######
+JDBC_CLASSPATH =	$MYSQL_CLASSPATH
+JDBC_DRIVER_CLASS =	$MYSQLDRV
+
+JDBC_URL =	$MOJAVE_BASE_URL/alaska_reports
+JDBC_USER =	$MOJAVE_INF_USER
+JDBC_PASSWORD =	$MOJAVE_INF_PASSWD
+%evalmacro ECHO_TXT dbprop_template
+echo	/mojaveak.props
+
+JDBC_URL =	$MOJAVE_BASE_URL/inf
+JDBC_USER =	$MOJAVE_INF_USER
+JDBC_PASSWORD =	$MOJAVE_INF_PASSWD
+%evalmacro ECHO_TXT dbprop_template
+echo	/mojaveinf.props
+
+JDBC_URL =	$MOJAVE_BASE_URL/inftest
+JDBC_USER =	$MOJAVE_INF_USER
+JDBC_PASSWORD =	$MOJAVE_INF_PASSWD
+%evalmacro ECHO_TXT dbprop_template
+echo	/mojaveinftest.props
+
+JDBC_URL =	$MOJAVE_BASE_URL/mysql
+JDBC_USER =	$MOJAVE_INF_USER
+JDBC_PASSWORD =	$MOJAVE_INF_PASSWD
+%evalmacro ECHO_TXT dbprop_template
+echo	/mojavemysql.props
+
+JDBC_URL =	$OJCBUILDS_BASE_URL/alaska_reports
+JDBC_USER =	$OJCBUILDS_USER
+JDBC_PASSWORD =	$OJCBUILDS_PASSWD
+%evalmacro ECHO_TXT dbprop_template
+echo	/ojcak.props
+
+JDBC_URL =	$OJCBUILDS_BASE_URL/mysql
+JDBC_USER =	root
+JDBC_PASSWORD =	cts123
+%evalmacro ECHO_TXT dbprop_template
+echo	/ojcmysql.props
