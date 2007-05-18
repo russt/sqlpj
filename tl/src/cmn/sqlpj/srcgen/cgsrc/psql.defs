@@ -59,8 +59,8 @@ EOF
 }
 
 { ### psql defs
-%ifndef PL_PACKAGE       PL_PACKAGE = $TESTDBI_PACKAGE
-PL_PACKAGE_DESCRIPTION = test the perl dbi, jdbc interfaces
+%ifndef PL_PACKAGE       PL_PACKAGE = $SQLPJ_PACKAGE
+PL_PACKAGE_DESCRIPTION = Main driver for sqlpj - a command-line SQL interpreter for JDBC.pm
 
 PL_PKG_IMPORTS := << EOF
 use Config;

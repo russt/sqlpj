@@ -13,7 +13,11 @@ PL_PACKAGE_DESCRIPTION = manange metadata for a single sql table
 PL_CONSTRUCTOR_NAME = new
 
 PL_PKG_IMPORTS := << EOF
+use JDBC;
+use Inline::Java qw(caught);
 use {=SQLCOLUMN_PACKAGE=};
+use {=SQLINDEX_PACKAGE=};
+use {=SQLINDEXKEY_PACKAGE=};
 EOF
 %evalmacro PL_PKG_IMPORTS PL_PKG_IMPORTS
 
@@ -21,6 +25,7 @@ PL_PKG_ATTRIBUTES := << EOF
 EOF
 #%evalmacro PL_PKG_ATTRIBUTES PL_PKG_ATTRIBUTES
 }
+
 { ## constructor section
 PL_CONSTRUCTOR_BODY := << EOF
 my ($jdbc_metadata, $dbname, $tblname) = @_;
@@ -34,6 +39,8 @@ PL_OBJ_ATTRIBUTES := << EOF
 'mColumnsByName' => {},             #hash - column objects keyed by column name
 'mAllColumns'    => [],             #array - list of column objects
 'mColumnNames'   => [],             #array - list of column names
+'mAllIndices'    => [],             #array - list of indices for this table
+'mIndexNames'    => [],             #array - list of index names
 EOF
 #%evalmacro PL_OBJ_ATTRIBUTES PL_OBJ_ATTRIBUTES
 
@@ -67,19 +74,32 @@ PL_ATTRIBUTE_NAME = AllColumns
 %evalmacro >> getset_methods pl_attrlist_method
 PL_ATTRIBUTE_NAME = ColumnNames
 %evalmacro >> getset_methods pl_attrlist_method
+PL_ATTRIBUTE_NAME = AllIndices
+%evalmacro >> getset_methods pl_attrlist_method
+PL_ATTRIBUTE_NAME = IndexNames
+%evalmacro >> getset_methods pl_attrlist_method
 
 PL_PKG_METHODS := << EOF
+sub addIndex
+#add an sql index to the list of indicies associated with this table
+{
+    my ($self, $idx) = @_;
+
+    push @{$self->{'mAllIndices'}}, $idx;
+    push @{$self->{'mIndexNames'}}, $idx->name();
+}
+
 sub setTableAttributes
 #initialize column attributes for our table.
 {
     my ($self) = @_;
 
-#printf STDERR "tblname='%s' dbname='%s'\n", $tblname, $dbname;
-
     my $dbMetaData = $self->metaData();
     my $dbname = $self->databaseName();
     my $tblname = $self->tableName();
     my $str = "";
+
+#printf STDERR "setTableAttributes: tblname='%s' dbname='%s'\n", $tblname, $dbname;
 
     eval {
         #######
@@ -137,15 +157,69 @@ sub setTableAttributes
         # CARDINALITY, PAGES, FILTER_CONDITION
         #########
 #'getIndexInfo(String catalog, String schema, String table, boolean unique, boolean approximate)'  => 'ResultSet',
-        #$rsetc = $dbMetaData->getIndexInfo($dbname, "%", $tblname, 0, 0);
+        my $lastIndexName = "";
+        my $indexName = "";
+        my $cname = "";
+
+        my $idxobj = undef;
+        my $keyobj = undef;
+        my $isPrimary = 0;
+
+        $rset = $dbMetaData->getIndexInfo($dbname, "%", $tblname, 0, 0);
+        while ($rset->next()) {
+
+            #note - we should never get a null index:
+            $str = $rset->getString("INDEX_NAME"); $str = $rset->wasNull() ? "(NULL)" : $str;
+            $indexName = $str;
+
+            $str = $rset->getString("COLUMN_NAME"); $str = $rset->wasNull() ? "(NULL)" : $str;
+            $cname = $str;
+
+            if ($lastIndexName eq $indexName) {
+#printf "%s: CONTINUE OLD RECORD lastIndexName=%s indexName=%s cname=%s\n", $tblname, $lastIndexName, $indexName, $cname;
+                $keyobj = new {=SQLINDEXKEY_PACKAGE=} ($indexName, $cname);
+                #push key on index:
+                $idxobj->addKey($keyobj);
+            } else {
+
+                if ($lastIndexName eq "" ){
+#printf "\n%s: FIRST ITERATION: SKIP CLOSE lastIndexName=%s indexName=%s cname=%s\n", $tblname, $lastIndexName, $indexName, $cname;
+                } else {
+#printf "%s: CLOSE OLD RECORD lastIndexName=%s indexName=%s cname=%s\n", $tblname, $lastIndexName, $indexName, $cname;
+                    #show index:
+                    $idxobj->showIndex();
+                }
+
+#printf "%s: CREATE NEW RECORD lastIndexName=%s indexName=%s cname=%s\n", $tblname, $lastIndexName, $indexName, $cname;
+                #create new record:
+                $isPrimary = ($indexName eq "PRIMARY")? 1 : 0;
+
+                $idxobj = new {=SQLINDEX_PACKAGE=} ($tblname, $indexName, $isPrimary);
+                #push index on table:
+                $self->addIndex($idxobj);
+
+                $keyobj = new {=SQLINDEXKEY_PACKAGE=} ($indexName, $cname);
+                #push key on index:
+                $idxobj->addKey($keyobj);
+            }
+
+            $lastIndexName = $indexName;
+        }
+
+        #if we entered the loop, then we need to close the last record:
+        if ($lastIndexName ne "" ) {
+#printf "%s: CLOSE OLD RECORD lastIndexName=%s indexName=%s cname=%s\n", $tblname, $lastIndexName, $indexName, $cname;
+            #show index:
+            $idxobj->showIndex();
+        }
     };
 
     if ($@) {
         if (caught("java.sql.SQLException")){
             my $msg = $@->getMessage() ;
-            printf STDERR "%s[tablesCommand]:  Java exception: '%s'\n", $pkgname, $msg;
+            printf STDERR "%s[setTableAttributes]:  Java exception: '%s'\n", $pkgname, $msg;
         } else {
-            printf STDERR "%s[tablesCommand]:  ERROR: '%s'\n",$pkgname, $@;
+            printf STDERR "%s[setTableAttributes]:  ERROR: '%s'\n",$pkgname, $@;
         }
         return;
     }
@@ -158,24 +232,32 @@ sub showCreateSql
     my $db = $self->databaseName();
     my $tbl = $self->tableName();
 
+#### SOI
     printf <<"!", $db, $tbl, $db, $tbl;
 DROP TABLE IF EXISTS `%s`.`%s`;
 CREATE TABLE `%s`.`%s` (
 !
+#### EOI
 
     for my $col ($self->allColumns()) {
-        printf "    `%s` %s(%d) %s,\n",
+        printf "    `%s` %s %s,\n",
             $col->columnName(),
-            $col->columnType(),
-            $col->columnSize(),
+            $col->columnCreateType(),
             $col->columnIsNullable() ? "NULL" : "NOT NULL",
             ;
     }
 
+    #generate index create:
+    for my $idx ($self->allIndices()) {
+        printf "    %s\n", $idx->indexCreateStr();
+    }
+
+#### SOI
     print <<"!";
 );
 
 !
+#### EOI
 
 }
 

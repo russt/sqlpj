@@ -66,6 +66,19 @@ PL_ATTRIBUTE_NAME = ColumnIsNullable
 
 PL_PKG_METHODS := << EOF
 
+sub columnCreateType
+#return string for type name needed for create table statement
+{
+    my ($self) = @_;
+
+    if ($self->columnType() eq "text") {
+        #length is implied for text:
+        return sprintf("%s", $self->columnType());
+    } else {
+        return sprintf("%s(%s)", $self->columnType(), $self->columnSize());
+    }
+}
+
 {=getset_methods=}
 EOF
 

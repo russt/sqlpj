@@ -241,7 +241,7 @@ sub displayXmlResults
         for (my $jj = 0; $jj <= $#$rref; $jj++) {
             #display the row unless it was SQL NULL:
             if (defined($$rref[$jj])) {
-                printf "%s</%s>%s</%s>\n", $indent, $headers[$jj], $$rref[$jj], $headers[$jj];
+                printf "%s<%s>%s</%s>\n", $indent, $headers[$jj], $$rref[$jj], $headers[$jj];
             }
         }
 
@@ -464,10 +464,10 @@ Local commands are:
 
  show conn[ection]    - show jdbc connection properties, including product & version
  show create [table]  - generate sql to create all tables, or a single table.
+ show ind[ices] table - show the indices for a single table
  show db              - show db name
  show metadata        - show jdbc metadata (long)
 !
-
 
 #not yet implemented:
 #help [command]       - show this message, or help about specific <command>.
@@ -496,6 +496,9 @@ sub showCommand
     } elsif ($buf  =~ /^db/i) {
         $buf =~ s/db\s*//i;
         $self->showDataBase($buf);
+    } elsif ($buf  =~ /^ind/i) {
+        $buf =~ s/ind[^\s]*\s*//i;
+        $self->showIndicesCommand($buf);
     } elsif ($buf  =~ /^meta/i) {
         $buf =~ s/meta[^\s]*\s*//i;
         $self->showMetaData($buf);
@@ -543,7 +546,7 @@ sub showCreate
 {
     my ($self, $buf) = @_;
 
-    #create new tables object:
+    #get a copy of current tables object:
     my $tables = $self->getSqlTables();
     my $tbl = undef;
     my $nerrs = 0;
@@ -581,6 +584,55 @@ sub showDataBase
     $self->sql_exec("select DATABASE()");
 }
 
+sub showIndicesCommand
+#implement the show indices command, which displays the indices for a single table
+#Usage:  show ind[ices] table_name
+{
+    my ($self, $tblname) = @_;
+    my $dbname = "";
+
+    my @excludenamesc = (
+        "TABLE_CAT",
+        "TABLE_SCHEM",
+#       "TABLE_NAME",
+#       "NON_UNIQUE",
+#       "INDEX_QUALIFIER",
+#       "INDEX_NAME",
+        "TYPE",
+#       "ORDINAL_POSITION",
+#       "COLUMN_NAME",
+#       "ASC_OR_DESC",
+        "CARDINALITY",
+        "PAGES",
+        "FILTER_CONDITION"
+    );
+
+#printf STDERR "tblname='%s' dbname='%s'\n", $tblname, $dbname;
+
+    my $dbMetaData = $self->getMetaData();
+    my $rsetc = undef;
+
+    eval {
+        #########
+        #Indicies
+        #########
+#'getIndexInfo(String catalog, String schema, String table, boolean unique, boolean approximate)'  => 'ResultSet',
+        $rsetc = $dbMetaData->getIndexInfo($dbname, "%", $tblname, 0, 0);
+    };
+
+    if ($@) {
+        if (caught("java.sql.SQLException")){
+            my $msg = $@->getMessage() ;
+            printf STDERR "%s[showTablesCommand]:  Java exception: '%s'\n", $pkgname, $msg;
+        } else {
+            printf STDERR "%s[showTablesCommand]:  ERROR: '%s'\n",$pkgname, $@;
+        }
+        return;
+    }
+
+    $self->displayResultSet($rsetc, &columnExcludeMap($rsetc, @excludenamesc));
+}
+
 sub showTableCommand
 #implement the table command, which shows information about a single table
 #Usage:  table table_name
@@ -600,13 +652,13 @@ sub showTableCommand
         "BUFFER_LENGTH",
         "DECIMAL_DIGITS",
         "NUM_PREC_RADIX",
-        "NULLABLE",
+#       "NULLABLE",
         "REMARKS",
         "COLUMN_DEF",
         "SQL_DATA_TYPE",
         "SQL_DATETIME_SUB",
         "CHAR_OCTET_LENGTH",
-        "ORDINAL_POSITION",
+#       "ORDINAL_POSITION",
         "IS_NULLABLE",
     );
 

@@ -3,7 +3,7 @@
 %include dbprops.defs
 
 {
-    PL_PACKAGE = $SQLCOLUMN_PACKAGE
+    PL_PACKAGE = $SQLTABLES_PACKAGE
     %include $PL_PACKAGE.defs
     perl/prlobj.ptpl                 /$PL_PACKAGE.pm
 }
@@ -15,7 +15,19 @@
 }
 
 {
-    PL_PACKAGE = $SQLTABLES_PACKAGE
+    PL_PACKAGE = $SQLCOLUMN_PACKAGE
+    %include $PL_PACKAGE.defs
+    perl/prlobj.ptpl                 /$PL_PACKAGE.pm
+}
+
+{
+    PL_PACKAGE = $SQLINDEX_PACKAGE
+    %include $PL_PACKAGE.defs
+    perl/prlobj.ptpl                 /$PL_PACKAGE.pm
+}
+
+{
+    PL_PACKAGE = $SQLINDEXKEY_PACKAGE
     %include $PL_PACKAGE.defs
     perl/prlobj.ptpl                 /$PL_PACKAGE.pm
 }
@@ -36,7 +48,7 @@
 
 {
     #main program:
-    PL_PACKAGE = $TESTDBI_PACKAGE
+    PL_PACKAGE = $SQLPJ_PACKAGE
     %include psql.defs
     perl/prlskel.ptpl                 /$PL_PACKAGE.pl
 }
@@ -52,6 +64,6 @@
 %ifnot $CG_SHELL_STATUS CG_SHELL_STATUS = 1
 
 #create symlinks for prlskel programs:
-TESTDBI_CMD = $TESTDBI_PACKAGE
+SQLPJ_CMD = $SQLPJ_PACKAGE
 %ifndef NO_SYMLINKS %echo creating prlskel links ...
-%ifndef NO_SYMLINKS %shell cd $CG_ROOT; rm -f $TESTDBI_CMD; ln -s `fwhich prlskel` $TESTDBI_CMD
+%ifndef NO_SYMLINKS %shell cd $CG_ROOT; rm -f $SQLPJ_CMD; ln -s `fwhich prlskel` $SQLPJ_CMD
