@@ -17,8 +17,14 @@ MINOR:
 o push setting of pathSeparator down into pkgconfig object (currently in main).
 o should I be cleaning up the "_Inline" dir when I exit?
 
+PROCESS:
+o need to build regression test suite against an embedded db - derby or hsql perhaps?
+
 MISSING FEATURES:
 
+o FEATURE: diagnostics when jdbc connection fails
+o FEATURE: diagnostics when JDBC.pm or Inline::Java packages are unavailable
+o FEATURE: reconnect when disconnected after idle period (workaround: use db)
 o FEATURE: add dump/restore of database or tables in portable XML format.
 o FEATURE: add index creation for show create [table] command.
 o FEATURE: ORACLE SUPPORT: test all features against ORACLE instance
