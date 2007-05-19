@@ -111,11 +111,34 @@ sub setTableAttributes
 #printf STDERR "setTableAttributes: tblname='%s' dbname='%s'\n", $tblname, $dbname;
 
     eval {
+        my $rset = undef;
+        my %autoIncrementColumns = ();
+
+        ######
+        #DUMMY select to get information about columns
+        ######
+        my $con = $dbMetaData->getConnection();
+        my $stmt = $con->createStatement();
+        my $sqlbuf = sprintf("select * from %s where 1 = 2", $tblname);
+        if ($stmt->execute($sqlbuf)) {
+            $rset      = $stmt->getResultSet();
+            my $m      = $rset->getMetaData();
+            my $colcnt = $m->getColumnCount();
+
+            for (my $ii = 1; $ii <= $colcnt; $ii++) {
+                my $cname = $m->getColumnLabel($ii);
+#printf STDERR "%s[%s]:isAutoIncrement(%d)=%d\n", $tblname, $cname, $ii, $m->isAutoIncrement($ii);
+                $autoIncrementColumns{$cname} = $m->isAutoIncrement($ii);
+            }
+        } else {
+            printf STDERR "%s[setTableAttributes]:  cannot exec DUMMY query on %s\n", $pkgname, $tblname;
+        }
+
         #######
         #column info
         #######
 #'getColumns(String catalog, String schemaPattern, String tableNamePattern, String columnNamePattern)'  => 'ResultSet',
-        my $rset = $dbMetaData->getColumns($dbname, "%", $tblname, "%");
+        $rset = $dbMetaData->getColumns($dbname, "%", $tblname, "%");
 
         #######
         # table atributes:
@@ -152,7 +175,10 @@ sub setTableAttributes
             #create new column object:
             #######
             $self->{'mColumnsByName'}->{$cname} =
-                new {=SQLCOLUMN_PACKAGE=}($tblname, $cname, $ctype, $csize, $cnullable, $cdefault, $decimalDigits);
+                new {=SQLCOLUMN_PACKAGE=}(
+                    $tblname, $cname, $ctype, $csize, $cnullable, $cdefault, $decimalDigits,
+                    $autoIncrementColumns{$cname}
+                );
 
             #push column name & reference to column object:
             push @{$self->{'mColumnNames'}}, $cname;

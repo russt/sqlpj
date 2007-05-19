@@ -23,7 +23,7 @@ EOF
 
 { ## constructor section
 PL_CONSTRUCTOR_BODY := << EOF
-my ($tblname, $cname, $ctype, $csize, $cnullable, $cdefault, $decimalDigits) = @_;
+my ($tblname, $cname, $ctype, $csize, $cnullable, $cdefault, $decimalDigits, $isAutoIncrement) = @_;
 EOF
 #%evalmacro PL_CONSTRUCTOR_BODY PL_CONSTRUCTOR_BODY
 
@@ -35,6 +35,7 @@ PL_OBJ_ATTRIBUTES := << EOF
 'mColumnIsNullable' => $cnullable,
 'mColumnDefault'    => $cdefault,
 'mDecimalDigits'    => $decimalDigits,
+'mIsAutoIncrement'  => $isAutoIncrement,
 EOF
 #%evalmacro PL_OBJ_ATTRIBUTES PL_OBJ_ATTRIBUTES
 
@@ -69,6 +70,8 @@ PL_ATTRIBUTE_NAME = ColumnDefault
 %evalmacro >> getset_methods pl_attr_method
 PL_ATTRIBUTE_NAME = DecimalDigits
 %evalmacro >> getset_methods pl_attr_method
+PL_ATTRIBUTE_NAME = IsAutoIncrement
+%evalmacro >> getset_methods pl_attr_method
 
 PL_PKG_METHODS := << EOF
 
@@ -77,15 +80,23 @@ sub columnCreateAttributes
 {
     my ($self) = @_;
 
-    #DEFAULT is only current attribute.
-    return "" unless (defined($self->columnDefault()) && $self->columnDefault() ne "");
-
-    #if numerical value, then don't quote the value:
-    if ($self->columnType() =~ /(int|decimal)/i ) {
-        return sprintf(" DEFAULT %s", $self->columnDefault())
-    } else {
-        return sprintf(" DEFAULT '%s'", $self->columnDefault())
+    my $defaultStr = "";
+    
+    if (defined($self->columnDefault()) && $self->columnDefault() ne "") {
+	#if numerical value, then don't quote the value:
+	if ($self->columnType() =~ /(int|decimal)/i ) {
+	    $defaultStr = sprintf(" DEFAULT %s", $self->columnDefault());
+	} else {
+	    $defaultStr = sprintf(" DEFAULT '%s'", $self->columnDefault());
+	}
     }
+
+    #set auto_increment:
+    my $autoStr = "";
+
+    $autoStr = " auto_increment" if ($self->isAutoIncrement());
+    
+    return sprintf("%s%s", $autoStr, $defaultStr);
 }
 
 sub qcolumnName
