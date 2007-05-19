@@ -23,7 +23,7 @@ EOF
 
 { ## constructor section
 PL_CONSTRUCTOR_BODY := << EOF
-my ($tblname, $cname, $ctype, $csize, $cnullable) = @_;
+my ($tblname, $cname, $ctype, $csize, $cnullable, $cdefault, $decimalDigits) = @_;
 EOF
 #%evalmacro PL_CONSTRUCTOR_BODY PL_CONSTRUCTOR_BODY
 
@@ -33,6 +33,8 @@ PL_OBJ_ATTRIBUTES := << EOF
 'mColumnType'       => $ctype,
 'mColumnSize'       => $csize,
 'mColumnIsNullable' => $cnullable,
+'mColumnDefault'    => $cdefault,
+'mDecimalDigits'    => $decimalDigits,
 EOF
 #%evalmacro PL_OBJ_ATTRIBUTES PL_OBJ_ATTRIBUTES
 
@@ -63,19 +65,53 @@ PL_ATTRIBUTE_NAME = ColumnSize
 %evalmacro >> getset_methods pl_attr_method
 PL_ATTRIBUTE_NAME = ColumnIsNullable
 %evalmacro >> getset_methods pl_attr_method
+PL_ATTRIBUTE_NAME = ColumnDefault
+%evalmacro >> getset_methods pl_attr_method
+PL_ATTRIBUTE_NAME = DecimalDigits
+%evalmacro >> getset_methods pl_attr_method
 
 PL_PKG_METHODS := << EOF
 
-sub columnCreateType
-#return string for type name needed for create table statement
+sub columnCreateAttributes
+#return string with additional create attributes for a column
 {
     my ($self) = @_;
 
-    if ($self->columnType() eq "text") {
-        #length is implied for text:
-        return sprintf("%s", $self->columnType());
+    #DEFAULT is only current attribute.
+    return "" unless (defined($self->columnDefault()) && $self->columnDefault() ne "");
+
+    #if numerical value, then don't quote the value:
+    if ($self->columnType() =~ /(int|decimal)/i ) {
+        return sprintf(" DEFAULT %s", $self->columnDefault())
     } else {
-        return sprintf("%s(%s)", $self->columnType(), $self->columnSize());
+        return sprintf(" DEFAULT '%s'", $self->columnDefault())
+    }
+}
+
+sub qcolumnName
+#return quoted column name
+#TODO look up quote char in metadata.
+{
+    my ($self) = @_;
+
+    return( "`" . $self->columnName() . "`" );
+}
+
+sub columnCreateType
+#return string for type name needed for the create table statement
+{
+    my ($self) = @_;
+
+    my ($ctype) = $self->columnType();
+    $ctype =~ tr/[a-z]/[A-Z]/;
+
+    if ($ctype =~ /(TEXT|TIME)/ ) {
+        #length is implied for certain data types:
+        return sprintf("%s", $ctype);
+    } elsif ($ctype =~ /DECIMAL/ ) {
+        return sprintf("%s(%s, %s)", $ctype, $self->columnSize(), $self->decimalDigits());
+    } else {
+        return sprintf("%s(%s)", $ctype, $self->columnSize());
     }
 }
 

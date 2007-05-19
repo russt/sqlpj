@@ -623,9 +623,9 @@ sub showIndicesCommand
     if ($@) {
         if (caught("java.sql.SQLException")){
             my $msg = $@->getMessage() ;
-            printf STDERR "%s[showTablesCommand]:  Java exception: '%s'\n", $pkgname, $msg;
+            printf STDERR "%s[showIndicesCommand]:  Java exception: '%s'\n", $pkgname, $msg;
         } else {
-            printf STDERR "%s[showTablesCommand]:  ERROR: '%s'\n",$pkgname, $@;
+            printf STDERR "%s[showIndicesCommand]:  ERROR: '%s'\n",$pkgname, $@;
         }
         return;
     }
@@ -650,11 +650,11 @@ sub showTableCommand
 #       "TYPE_NAME",
 #       "COLUMN_SIZE",
         "BUFFER_LENGTH",
-        "DECIMAL_DIGITS",
-        "NUM_PREC_RADIX",
+#       "DECIMAL_DIGITS",
+#       "NUM_PREC_RADIX",
 #       "NULLABLE",
         "REMARKS",
-        "COLUMN_DEF",
+#       "COLUMN_DEF",
         "SQL_DATA_TYPE",
         "SQL_DATETIME_SUB",
         "CHAR_OCTET_LENGTH",
@@ -725,9 +725,9 @@ sub showTableCommand
     if ($@) {
         if (caught("java.sql.SQLException")){
             my $msg = $@->getMessage() ;
-            printf STDERR "%s[showTablesCommand]:  Java exception: '%s'\n", $pkgname, $msg;
+            printf STDERR "%s[showTableCommand]:  Java exception: '%s'\n", $pkgname, $msg;
         } else {
-            printf STDERR "%s[showTablesCommand]:  ERROR: '%s'\n",$pkgname, $@;
+            printf STDERR "%s[showTableCommand]:  ERROR: '%s'\n",$pkgname, $@;
         }
         return;
     }

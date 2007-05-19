@@ -80,6 +80,15 @@ PL_ATTRIBUTE_NAME = IndexNames
 %evalmacro >> getset_methods pl_attrlist_method
 
 PL_PKG_METHODS := << EOF
+
+sub columnsByName
+#return mColumnsByName list
+{
+    my ($self, $cname) = @_;
+
+    return $self->{'mColumnsByName'}->{$cname};
+}
+
 sub addIndex
 #add an sql index to the list of indicies associated with this table
 {
@@ -120,23 +129,30 @@ sub setTableAttributes
         #for each entry, allocate a new column object:
         while ($rset->next()) {
             #note - you have to do the fetch first, which sets wasNull() for the current column.
-            $str = $rset->getString("COLUMN_NAME"); $str = $rset->wasNull() ? "(null)" : $str;
+            $str = $rset->getString("COLUMN_NAME"); $str = $rset->wasNull() ? undef : $str;
             my $cname = $str;
 
-            $str = $rset->getString("TYPE_NAME"); $str = $rset->wasNull() ? "(null)" : $str;
+            $str = $rset->getString("TYPE_NAME"); $str = $rset->wasNull() ? undef : $str;
             my $ctype = $str;
 
-            $str = $rset->getString("COLUMN_SIZE"); $str = $rset->wasNull() ? "(null)" : $str;
+            $str = $rset->getString("COLUMN_SIZE"); $str = $rset->wasNull() ? undef : $str;
             my $csize = $str;
 
-            $str = $rset->getString("NULLABLE"); $str = $rset->wasNull() ? "(null)" : $str;
+            $str = $rset->getString("NULLABLE"); $str = $rset->wasNull() ? undef : $str;
+            #my $cnullable = ($str eq "0")? 0 : 1;
             my $cnullable = $str;
+
+            $str = $rset->getString("COLUMN_DEF"); $str = $rset->wasNull() ? undef : $str;
+            my $cdefault = $str;
+
+            $str = $rset->getString("DECIMAL_DIGITS"); $str = $rset->wasNull() ? undef  : $str;
+            my $decimalDigits = $str;
 
             #######
             #create new column object:
             #######
             $self->{'mColumnsByName'}->{$cname} =
-                new {=SQLCOLUMN_PACKAGE=}($tblname, $cname, $ctype, $csize, $cnullable);
+                new {=SQLCOLUMN_PACKAGE=}($tblname, $cname, $ctype, $csize, $cnullable, $cdefault, $decimalDigits);
 
             #push column name & reference to column object:
             push @{$self->{'mColumnNames'}}, $cname;
@@ -164,20 +180,24 @@ sub setTableAttributes
         my $idxobj = undef;
         my $keyobj = undef;
         my $isPrimary = 0;
+        my $isUnique  = 0;
 
         $rset = $dbMetaData->getIndexInfo($dbname, "%", $tblname, 0, 0);
         while ($rset->next()) {
 
             #note - we should never get a null index:
-            $str = $rset->getString("INDEX_NAME"); $str = $rset->wasNull() ? "(NULL)" : $str;
+            $str = $rset->getString("INDEX_NAME"); $str = $rset->wasNull() ? undef : $str;
             $indexName = $str;
 
-            $str = $rset->getString("COLUMN_NAME"); $str = $rset->wasNull() ? "(NULL)" : $str;
+            $str = $rset->getString("COLUMN_NAME"); $str = $rset->wasNull() ? undef : $str;
             $cname = $str;
+
+            $str = $rset->getString("NON_UNIQUE"); $str = $rset->wasNull() ? undef : $str;
+            $isUnique = ($str =~ /true/i)? 0 : 1;
 
             if ($lastIndexName eq $indexName) {
 #printf "%s: CONTINUE OLD RECORD lastIndexName=%s indexName=%s cname=%s\n", $tblname, $lastIndexName, $indexName, $cname;
-                $keyobj = new {=SQLINDEXKEY_PACKAGE=} ($indexName, $cname);
+                $keyobj = new {=SQLINDEXKEY_PACKAGE=} ($indexName, $cname, $self->columnsByName($cname));
                 #push key on index:
                 $idxobj->addKey($keyobj);
             } else {
@@ -186,19 +206,19 @@ sub setTableAttributes
 #printf "\n%s: FIRST ITERATION: SKIP CLOSE lastIndexName=%s indexName=%s cname=%s\n", $tblname, $lastIndexName, $indexName, $cname;
                 } else {
 #printf "%s: CLOSE OLD RECORD lastIndexName=%s indexName=%s cname=%s\n", $tblname, $lastIndexName, $indexName, $cname;
-                    #show index:
-                    $idxobj->showIndex();
+#$idxobj->showIndex();
                 }
 
-#printf "%s: CREATE NEW RECORD lastIndexName=%s indexName=%s cname=%s\n", $tblname, $lastIndexName, $indexName, $cname;
                 #create new record:
                 $isPrimary = ($indexName eq "PRIMARY")? 1 : 0;
 
-                $idxobj = new {=SQLINDEX_PACKAGE=} ($tblname, $indexName, $isPrimary);
+#printf "%s: CREATE NEW RECORD lastIndexName=%s indexName=%s cname=%s isPrimary=%d isUnique=%d\n", $tblname, $lastIndexName, $indexName, $cname, $isPrimary, $isUnique;
+
+                $idxobj = new {=SQLINDEX_PACKAGE=} ($tblname, $indexName, $isPrimary, $isUnique);
                 #push index on table:
                 $self->addIndex($idxobj);
 
-                $keyobj = new {=SQLINDEXKEY_PACKAGE=} ($indexName, $cname);
+                $keyobj = new {=SQLINDEXKEY_PACKAGE=} ($indexName, $cname, $self->columnsByName($cname));
                 #push key on index:
                 $idxobj->addKey($keyobj);
             }
@@ -209,8 +229,7 @@ sub setTableAttributes
         #if we entered the loop, then we need to close the last record:
         if ($lastIndexName ne "" ) {
 #printf "%s: CLOSE OLD RECORD lastIndexName=%s indexName=%s cname=%s\n", $tblname, $lastIndexName, $indexName, $cname;
-            #show index:
-            $idxobj->showIndex();
+#$idxobj->showIndex();
         }
     };
 
@@ -239,18 +258,23 @@ CREATE TABLE `%s`.`%s` (
 !
 #### EOI
 
+    my @lines = ();
     for my $col ($self->allColumns()) {
-        printf "    `%s` %s %s,\n",
-            $col->columnName(),
+        push @lines, sprintf("    %s %s %s%s",
+            $col->qcolumnName(),
             $col->columnCreateType(),
             $col->columnIsNullable() ? "NULL" : "NOT NULL",
-            ;
+            $col->columnCreateAttributes(),
+            );
     }
 
-    #generate index create:
+    #generate index creates:
     for my $idx ($self->allIndices()) {
-        printf "    %s\n", $idx->indexCreateStr();
+        push @lines, sprintf("    %s", $idx->indexCreateStr());
     }
+
+    #ouput lines:
+    printf "%s\n", join(",\n", @lines);
 
 #### SOI
     print <<"!";
