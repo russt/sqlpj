@@ -1,0 +1,122 @@
+#
+#sqlindex.defs -  definitions for sqlindex object.
+#
+
+#allows us to run stand-alone:
+%ifndef CG_ROOT %include ../build_setup.defs
+
+{ ## header section
+PL_PACKAGE = $SQLINDEX_PACKAGE
+PL_PACKAGE_DESCRIPTION = A single SQL index associated with a table
+
+#not a base class - use standard constuctor name:
+PL_CONSTRUCTOR_NAME = new
+
+PL_PKG_IMPORTS := << EOF
+EOF
+#%evalmacro PL_PKG_IMPORTS PL_PKG_IMPORTS
+
+PL_PKG_ATTRIBUTES := << EOF
+EOF
+#%evalmacro PL_PKG_ATTRIBUTES PL_PKG_ATTRIBUTES
+}
+{ ## constructor section
+PL_CONSTRUCTOR_BODY := << EOF
+my ($tblname, $iname, $isPrimary, $isUnique) = @_;
+EOF
+#%evalmacro PL_CONSTRUCTOR_BODY PL_CONSTRUCTOR_BODY
+
+PL_OBJ_ATTRIBUTES := << EOF
+'mName'       => $iname,         #the name of this index
+'mTableName'  => $tblname,       #the name of this index's table
+'mIsPrimary'  => $isPrimary,     #true (1) if this is a primary index
+'mIsUnique'   => $isUnique,      #true (1) if this is a unique index
+'mIndexKeys'  => [],             #array - list of key objects for this index
+'mKeyNames'   => [],             #array - list of the key names for this index
+EOF
+#%evalmacro PL_OBJ_ATTRIBUTES PL_OBJ_ATTRIBUTES
+
+#this is for further initialzation of attributes, since hash init cannot be self-referential:
+PL_POST_ATTRIBUTE_INIT := << EOF
+EOF
+#%evalmacro PL_POST_ATTRIBUTE_INIT PL_POST_ATTRIBUTE_INIT
+}
+
+{ ## class methods
+
+#clear standard accessor accumulator:
+getset_methods =
+
+#generate read-only attributes:
+PL_ATTRIBUTE_NAME = Name
+%evalmacro >> getset_methods pl_attr_method
+PL_ATTRIBUTE_NAME = TableName
+%evalmacro >> getset_methods pl_attr_method
+PL_ATTRIBUTE_NAME = IsPrimary
+%evalmacro >> getset_methods pl_attr_method
+PL_ATTRIBUTE_NAME = IsUnique
+%evalmacro >> getset_methods pl_attr_method
+
+#generate read-only list attributes:
+PL_ATTRIBUTE_NAME = IndexKeys
+%evalmacro >> getset_methods pl_attrlist_method
+PL_ATTRIBUTE_NAME = KeyNames
+%evalmacro >> getset_methods pl_attrlist_method
+
+PL_PKG_METHODS := << EOF
+sub addKey
+#add an sql key to the list of keys associated with this index
+{
+    my ($self, $key) = @_;
+
+    push @{$self->{'mIndexKeys'}}, $key;
+    push @{$self->{'mKeyNames'}}, $key->name();
+}
+
+sub showIndex
+#display the index and attributes
+{
+    my ($self) = @_;
+
+    #for now..
+    printf "%s\n", $self->indexCreateStr();
+}
+
+sub qname
+#quoted index name
+{
+    my ($self) = @_;
+
+    #TODO: lookup quote char in metadata.
+    return sprintf("`%s`", $self->name());
+}
+
+sub indexCreateStr
+#display sql command to create an index within the context
+#of a create table statement.
+#TODO:  look up attribute quoting char in metadata
+{
+    my ($self) = @_;
+
+    #is this a unique index?
+    my $unique = $self->isUnique()? "UNIQUE " : "";
+
+    #loop thru keys and get the key create attributes:
+    my @keylist = ();
+    for my $kk ($self->indexKeys()) {
+        push @keylist, $kk->keyCreateStr();
+    }
+
+    if ($self->isPrimary()) {
+        return sprintf("PRIMARY KEY (%s)", join(", ", @keylist) );
+    } else {
+        return sprintf("%sINDEX %s (%s)", $unique, $self->qname(), join(", ", @keylist) );
+    }
+}
+
+{=getset_methods=}
+EOF
+
+%evalmacro PL_PKG_METHODS PL_PKG_METHODS
+}
+

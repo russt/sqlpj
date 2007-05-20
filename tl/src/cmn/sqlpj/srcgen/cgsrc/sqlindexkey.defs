@@ -1,0 +1,93 @@
+#
+#sqlindexkey.defs -  definitions for sqlindexkey object.
+#
+
+#allows us to run stand-alone:
+%ifndef CG_ROOT %include ../build_setup.defs
+
+{ ## header section
+PL_PACKAGE = $SQLINDEXKEY_PACKAGE
+PL_PACKAGE_DESCRIPTION = A single key attribute associated with an SQL index
+
+#not a base class - use standard constuctor name:
+PL_CONSTRUCTOR_NAME = new
+
+PL_PKG_IMPORTS := << EOF
+use {=SQLCOLUMN_PACKAGE=};
+EOF
+%evalmacro PL_PKG_IMPORTS PL_PKG_IMPORTS
+
+PL_PKG_ATTRIBUTES := << EOF
+EOF
+#%evalmacro PL_PKG_ATTRIBUTES PL_PKG_ATTRIBUTES
+}
+
+{ ## constructor section
+PL_CONSTRUCTOR_BODY := << EOF
+my ($idxname, $keyname, $colobj) = @_;
+EOF
+#%evalmacro PL_CONSTRUCTOR_BODY PL_CONSTRUCTOR_BODY
+
+PL_OBJ_ATTRIBUTES := << EOF
+'mName'       => $keyname,         #the name of this key
+'mIndexName'  => $idxname,         #the name of the index this key belongs to
+'mColumnObj'  => $colobj,          #the column object associated with this key
+EOF
+#%evalmacro PL_OBJ_ATTRIBUTES PL_OBJ_ATTRIBUTES
+
+#this is for further initialzation of attributes, since hash init cannot be self-referential:
+PL_POST_ATTRIBUTE_INIT := << EOF
+EOF
+#%evalmacro PL_POST_ATTRIBUTE_INIT PL_POST_ATTRIBUTE_INIT
+}
+
+{ ## class methods
+
+#clear standard accessor accumulator:
+getset_methods =
+
+#generate read/write (get/set) accessors:
+#PL_ATTRIBUTE_NAME = XX
+#%evalmacro >> getset_methods pl_getsetlist
+
+#generate read-only attributes:
+PL_ATTRIBUTE_NAME = Name
+%evalmacro >> getset_methods pl_attr_method
+PL_ATTRIBUTE_NAME = IndexName
+%evalmacro >> getset_methods pl_attr_method
+PL_ATTRIBUTE_NAME = ColumnObj
+%evalmacro >> getset_methods pl_attr_method
+
+PL_PKG_METHODS := << EOF
+
+sub qname
+#quoted index name
+{
+    my ($self) = @_;
+
+    #TODO: lookup quote char in metadata.
+    return sprintf("`%s`", $self->name());
+}
+
+sub keyCreateStr
+#return the key name for the create table index create
+{
+    my ($self) = @_;
+
+    my $lenstr = "";
+
+    my $ctype = $self->columnObj()->columnType();
+
+    if ($ctype =~ /CHAR/i) {
+        $lenstr = sprintf("(%d)", $self->columnObj()->columnSize());
+    }
+
+    return sprintf("%s%s", $self->qname(), $lenstr);
+}
+
+{=getset_methods=}
+EOF
+
+%evalmacro PL_PKG_METHODS PL_PKG_METHODS
+}
+
