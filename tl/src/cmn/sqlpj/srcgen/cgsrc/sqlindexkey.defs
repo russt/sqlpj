@@ -74,11 +74,21 @@ sub keyCreateStr
 {
     my ($self) = @_;
 
+    return $self->qname();
+}
+
+sub keyCreateStrWithLength
+#return the key name for the create table index create,
+#including the length of VARCHAR keys.
+{
+    my ($self) = @_;
+
     my $lenstr = "";
 
     my $ctype = $self->columnObj()->columnType();
 
     if ($ctype =~ /CHAR/i) {
+        #TODO:  figure out the true index prefix length for each VARCHAR key:
         $lenstr = sprintf("(%d)", $self->columnObj()->columnSize());
     }
 

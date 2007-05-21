@@ -83,12 +83,12 @@ sub columnCreateAttributes
     my $defaultStr = "";
     
     if (defined($self->columnDefault()) && $self->columnDefault() ne "") {
-	#if numerical value, then don't quote the value:
-	if ($self->columnType() =~ /(int|decimal)/i ) {
-	    $defaultStr = sprintf(" DEFAULT %s", $self->columnDefault());
-	} else {
-	    $defaultStr = sprintf(" DEFAULT '%s'", $self->columnDefault());
-	}
+        #if numerical value, then don't quote the value:
+        if ($self->columnType() =~ /(int|decimal)/i ) {
+            $defaultStr = sprintf(" default %s", $self->columnDefault());
+        } else {
+            $defaultStr = sprintf(" default '%s'", $self->columnDefault());
+        }
     }
 
     #set auto_increment:
@@ -114,13 +114,13 @@ sub columnCreateType
     my ($self) = @_;
 
     my ($ctype) = $self->columnType();
-    $ctype =~ tr/[a-z]/[A-Z]/;
+    $ctype =~ tr/[A-Z]/[a-z]/;
 
-    if ($ctype =~ /(TEXT|TIME)/ ) {
+    if ($ctype =~ /(text|time)/ ) {
         #length is implied for certain data types:
         return sprintf("%s", $ctype);
-    } elsif ($ctype =~ /DECIMAL/ ) {
-        return sprintf("%s(%s, %s)", $ctype, $self->columnSize(), $self->decimalDigits());
+    } elsif ($ctype =~ /decimal/ ) {
+        return sprintf("%s(%s,%s)", $ctype, $self->columnSize(), $self->decimalDigits());
     } else {
         return sprintf("%s(%s)", $ctype, $self->columnSize());
     }

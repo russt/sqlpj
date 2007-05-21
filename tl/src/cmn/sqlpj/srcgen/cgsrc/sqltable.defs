@@ -271,6 +271,24 @@ sub setTableAttributes
 }
 
 sub showCreateSql
+#show the create table commands.
+{
+    my ($self) = @_;
+
+    my $tbl = $self->tableName();
+
+#### SOI
+    printf <<"!", $tbl, $tbl;
+-- DROP TABLE IF EXISTS `%s`;
+CREATE TABLE `%s` (
+!
+#### EOI
+
+    $self->showCreateTableCommon();
+}
+
+sub showCreateSqlWithDb
+#show the create table commands, including the database name as prefix.
 {
     my ($self) = @_;
 
@@ -279,10 +297,18 @@ sub showCreateSql
 
 #### SOI
     printf <<"!", $db, $tbl, $db, $tbl;
-DROP TABLE IF EXISTS `%s`.`%s`;
+-- DROP TABLE IF EXISTS `%s`.`%s`;
 CREATE TABLE `%s`.`%s` (
 !
 #### EOI
+
+    $self->showCreateTableCommon();
+}
+
+sub showCreateTableCommon
+#generate the common part of the table create statement.
+{
+    my ($self) = @_;
 
     my @lines = ();
     for my $col ($self->allColumns()) {
@@ -317,25 +343,3 @@ EOF
 
 %evalmacro PL_PKG_METHODS PL_PKG_METHODS
 }
-
-#    DROP TABLE IF EXISTS `inftest`.`branch`;
-#    CREATE TABLE `inftest`.`branch` (
-#      `branchid` BIGINT(11) NOT NULL auto_increment,
-#      `reposid` BIGINT(10) NOT NULL DEFAULT 0,
-#      `name` VARCHAR(50) NULL,
-#      `cvsbranchname` VARCHAR(50) NULL,
-#      `noticerelease` VARCHAR(5) NOT NULL DEFAULT '0',
-#      `resistance` VARCHAR(5) NULL,
-#      `activeflag` VARCHAR(5) NULL,
-#      `createdby` VARCHAR(11) NULL,
-#      `createdate` DATETIME NULL,
-#      `updatedby` VARCHAR(11) NULL,
-#      `updatedate` DATETIME NULL,
-#      `productid` BIGINT(10) NULL,
-#      `status` VARCHAR(50) NULL,
-#      `status_url` VARCHAR(100) NULL,
-#      `show_in_in` VARCHAR(2) NULL,
-#      INDEX `branch_idx` (`branchid`, `productid`, `reposid`, `name`(50)),
-#      UNIQUE INDEX `branch_unq_idx` (`productid`, `reposid`, `name`(50))
-#    ) ENGINE = INNODB;
-    
