@@ -134,6 +134,29 @@ sub checkSetClasspath
     }
 #printf STDERR "AFTER CLASSPATH='%s'\n", $ENV{'CLASSPATH'};
 }
+
+sub checkJdbcSettings
+#return true(1) if jdbc properties are all defined.
+{
+    my ($cfg) = @_;
+    my $errs = 0;
+
+    if (!defined($cfg->getJdbcDriverClass())) {
+        ++$errs; printf STDERR "%s:  missing JDBC driver class\n", $p;
+    }
+    if (!defined($cfg->getJdbcUrl())) {
+        ++$errs; printf STDERR "%s:  missing JDBC URL\n", $p 
+    }
+    if (!defined($cfg->getJdbcUser())) {
+        ++$errs; printf STDERR "%s:  missing JDBC User name\n", $p;
+    }
+    if (!defined($cfg->getJdbcPassword())) {
+        ++$errs; printf STDERR "%s:  missing JDBC User password\n", $p;
+    }
+
+    return($errs == 0);
+}
+
 EOF
 }
 
@@ -218,6 +241,12 @@ EOF
 } #end of parse arg loop defs
 
 PL_PARSE_ARGS_POST := << EOF
+#check the JDBC configuration:
+if (!&checkJdbcSettings($scfg)) {
+    printf STDERR "%s:  one or more JDBC connection settings are missing or incomplete - ABORT.\n", $p;
+    return 1;
+}
+
 #add to the CLASSPATH if required:
 &checkSetClasspath($scfg);
 
