@@ -1,0 +1,6 @@
+TARGET_OS = cmn & skel
+sqlpj.prl           bin/$TARGET_OS/sqlpj                 0555
+
+TARGET_OS=cmn
+sqlpj.pl            lib/$TARGET_OS/sqlpj.pl              0444
+
