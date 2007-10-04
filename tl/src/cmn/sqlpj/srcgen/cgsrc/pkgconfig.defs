@@ -3,7 +3,7 @@
 #
 
 #allows us to run stand-alone:
-%ifndef CG_ROOT %include ../build_setup.defs
+%ifdef BUILD_SETUP_COMPLETE %include build_setup.defs
 
 { ## header section
 PL_PACKAGE = $PKGCONFIG_PACKAGE

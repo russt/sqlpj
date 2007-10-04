@@ -3,7 +3,7 @@
 #
 
 #allows us to run stand-alone:
-%ifndef CG_ROOT %include ../build_setup.defs
+%ifdef BUILD_SETUP_COMPLETE %include build_setup.defs
 
 { ## header section
 PL_PACKAGE = $SQLTABLE_PACKAGE
@@ -12,14 +12,17 @@ PL_PACKAGE_DESCRIPTION = manange metadata for a single sql table
 #not a base class - use standard constuctor name:
 PL_CONSTRUCTOR_NAME = new
 
-PL_PKG_IMPORTS := << EOF
-use JDBC;
-use Inline::Java qw(caught);
-use {=SQLCOLUMN_PACKAGE=};
-use {=SQLINDEX_PACKAGE=};
-use {=SQLINDEXKEY_PACKAGE=};
+{
+PL_EXTERN_PKG_IMPORTS = << EOF
 EOF
-%evalmacro PL_PKG_IMPORTS PL_PKG_IMPORTS
+PL_PKG_IMPORTS = << EOF
+use $SQLCOLUMN_PACKAGE;
+use $SQLINDEX_PACKAGE;
+use $SQLINDEXKEY_PACKAGE;
+EOF
+%if    $GEN_ONE_MODULE   PL_PKG_IMPORTS = $PL_EXTERN_PKG_IMPORTS
+%ifnot $GEN_ONE_MODULE   PL_PKG_IMPORTS = $PL_EXTERN_PKG_IMPORTS$PL_PKG_IMPORTS
+}
 
 PL_PKG_ATTRIBUTES := << EOF
 EOF
@@ -260,7 +263,7 @@ sub setTableAttributes
     };
 
     if ($@) {
-        if (caught("java.sql.SQLException")){
+        if (&Inline::Java::caught("java.sql.SQLException")){
             my $msg = $@->getMessage() ;
             printf STDERR "%s[setTableAttributes]:  Java exception: '%s'\n", $pkgname, $msg;
         } else {

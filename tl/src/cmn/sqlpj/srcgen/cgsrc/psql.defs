@@ -62,11 +62,17 @@ EOF
 %ifndef PL_PACKAGE       PL_PACKAGE = $SQLPJ_PACKAGE
 PL_PACKAGE_DESCRIPTION = Main driver for sqlpj - a command-line SQL interpreter for JDBC.pm
 
-PL_PKG_IMPORTS := << EOF
+{
+PL_EXTERN_PKG_IMPORTS = << EOF
 use Config;
-use {=PKGCONFIG_PACKAGE=};
 EOF
-%evalmacro PL_PKG_IMPORTS PL_PKG_IMPORTS
+PL_PKG_IMPORTS = << EOF
+use $PKGCONFIG_PACKAGE;
+use $PSQLIMPL_PACKAGE;
+EOF
+%if    $GEN_ONE_MODULE   PL_PKG_IMPORTS = $PL_EXTERN_PKG_IMPORTS
+%ifnot $GEN_ONE_MODULE   PL_PKG_IMPORTS = $PL_EXTERN_PKG_IMPORTS$PL_PKG_IMPORTS
+}
 
 PL_PKG_ATTRIBUTES := << EOF
 my $USE_STDIN = 1;
@@ -78,10 +84,6 @@ EOF
 
 {
 PL_MAIN := << EOF
-
-#note - this pulls in JDBC.  we use require so we can set our CLASSPATH
-#before loading the inline java packages:
-require "{=PSQLIMPL_PACKAGE=}.pm";
 
 #######
 #create implementation class, passing in our configuration:
@@ -145,7 +147,7 @@ sub checkJdbcSettings
         ++$errs; printf STDERR "%s:  missing JDBC driver class\n", $p;
     }
     if (!defined($cfg->getJdbcUrl())) {
-        ++$errs; printf STDERR "%s:  missing JDBC URL\n", $p 
+        ++$errs; printf STDERR "%s:  missing JDBC URL\n", $p
     }
     if (!defined($cfg->getJdbcUser())) {
         ++$errs; printf STDERR "%s:  missing JDBC User name\n", $p;

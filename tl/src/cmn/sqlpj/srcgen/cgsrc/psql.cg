@@ -1,56 +1,74 @@
-%include build_setup.defs
-#please remove this dependency after pkgconfig object is finished:
+%ifndef BUILD_SETUP_COMPLETE %include ../build_setup.defs
+%ifdef DEBUG %echo ${CG_INFILE}:  CG_ROOT is $CG_ROOT
+
+#initialize one module if selected:
+ECHO_TXT =
+%if $GEN_ONE_MODULE	echo /$ONE_MODULE
+
+########
+#SUPPORT packages:
+########
 %include dbprops.defs
 
 {
-    PL_PACKAGE = $SQLTABLES_PACKAGE
-    %include $PL_PACKAGE.defs
-    perl/prlobj.ptpl                 /$PL_PACKAGE.pm
-}
-
-{
-    PL_PACKAGE = $SQLTABLE_PACKAGE
-    %include $PL_PACKAGE.defs
-    perl/prlobj.ptpl                 /$PL_PACKAGE.pm
-}
-
-{
-    PL_PACKAGE = $SQLCOLUMN_PACKAGE
-    %include $PL_PACKAGE.defs
-    perl/prlobj.ptpl                 /$PL_PACKAGE.pm
-}
-
-{
     PL_PACKAGE = $SQLINDEX_PACKAGE
-    %include $PL_PACKAGE.defs
-    perl/prlobj.ptpl                 /$PL_PACKAGE.pm
+    module_defs = $PL_PACKAGE.defs
+    %call generate_a_module
 }
 
 {
     PL_PACKAGE = $SQLINDEXKEY_PACKAGE
-    %include $PL_PACKAGE.defs
-    perl/prlobj.ptpl                 /$PL_PACKAGE.pm
+    module_defs = $PL_PACKAGE.defs
+    %call generate_a_module
+}
+
+{
+    PL_PACKAGE = $SQLCOLUMN_PACKAGE
+    module_defs = $PL_PACKAGE.defs
+    %call generate_a_module
+}
+
+{
+    PL_PACKAGE = $SQLTABLE_PACKAGE
+    module_defs = $PL_PACKAGE.defs
+    %call generate_a_module
+}
+
+{
+    #this object manages sql table metadata
+    PL_PACKAGE = $SQLTABLES_PACKAGE
+    module_defs = $PL_PACKAGE.defs
+    %call generate_a_module
 }
 
 {
     #configuration parameters:
     PL_PACKAGE = $PKGCONFIG_PACKAGE
-    %include $PL_PACKAGE.defs
-    perl/prlobj.ptpl                 /$PL_PACKAGE.pm
+    module_defs = $PL_PACKAGE.defs
+    %call generate_a_module
 }
 
 {
+    ##### for now, we need to generate this as a separate module so we
+    ##### can set the java CLASSPATH before JDBC is loaded.
+    #_save_GEN_ONE_MODULE = $GEN_ONE_MODULE
+    #GEN_ONE_MODULE = 0
+
     #this is sqlpj implementation:
     PL_PACKAGE = $PSQLIMPL_PACKAGE
-    %include psqlImpl.defs
-    perl/prlobj.ptpl                 /$PL_PACKAGE.pm
+    module_defs = psqlImpl.defs
+    %call generate_a_module
+
+    #GEN_ONE_MODULE = $_save_GEN_ONE_MODULE
 }
 
 {
-    #main program:
+    #this is the main program:
     PL_PACKAGE = $SQLPJ_PACKAGE
-    %include psql.defs
-    perl/prlskel.ptpl                 /$PL_PACKAGE.pl
+    module_defs = psql.defs
+    perl_template = perl/prlskel.ptpl
+    perl_outputfn = $PL_PACKAGE.pl
+    %call generate_a_module
 }
 
 #generate configuration properties for various database instances:
@@ -65,5 +83,5 @@
 
 #create symlinks for prlskel programs:
 SQLPJ_CMD = $SQLPJ_PACKAGE
-%ifndef NO_SYMLINKS %echo creating prlskel links ...
-%ifndef NO_SYMLINKS %shell cd $CG_ROOT; rm -f $SQLPJ_CMD; ln -s `fwhich prlskel` $SQLPJ_CMD
+%ifnot $NO_SYMLINKS %echo creating prlskel links ...
+%ifnot $NO_SYMLINKS %shell cd $CG_ROOT; rm -f $SQLPJ_CMD; ln -s `fwhich prlskel` $SQLPJ_CMD

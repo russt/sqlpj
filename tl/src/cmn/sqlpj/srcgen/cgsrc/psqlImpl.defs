@@ -3,7 +3,7 @@
 #
 
 #allows us to run stand-alone:
-%ifndef CG_ROOT %include build_setup.defs
+%ifdef BUILD_SETUP_COMPLETE %include build_setup.defs
 
 { ## header section
 %ifndef PL_PACKAGE       PL_PACKAGE = $PSQLIMPL_PACKAGE
@@ -12,13 +12,16 @@ PL_PACKAGE_DESCRIPTION = perl/jdbc sql command line interpreter
 #not a base class - use standard constuctor name:
 PL_CONSTRUCTOR_NAME = new
 
-PL_PKG_IMPORTS := << EOF
-use JDBC;
-use Inline::Java qw(caught);
-use {=SQLTABLES_PACKAGE=};
-use {=SQLTABLE_PACKAGE=};
+{
+PL_EXTERN_PKG_IMPORTS = << EOF
 EOF
-%evalmacro PL_PKG_IMPORTS PL_PKG_IMPORTS
+PL_PKG_IMPORTS = << EOF
+use $SQLTABLES_PACKAGE;
+use $SQLTABLE_PACKAGE;
+EOF
+%if    $GEN_ONE_MODULE   PL_PKG_IMPORTS = $PL_EXTERN_PKG_IMPORTS
+%ifnot $GEN_ONE_MODULE   PL_PKG_IMPORTS = $PL_EXTERN_PKG_IMPORTS$PL_PKG_IMPORTS
+}
 
 PL_PKG_ATTRIBUTES := << EOF
 my $mPROMPT = $pkgname . "> ";
@@ -193,7 +196,7 @@ sub sql_exec
     };
 
     if ($@) {
-        if (caught("java.sql.SQLException")){
+        if (&Inline::Java::caught("java.sql.SQLException")){
             my $msg = $@->getMessage() ;
             printf STDERR "%s[sql_exec]:  Java exception: execute: '%s'\n", $pkgname, $msg;
         } else {
@@ -322,13 +325,18 @@ sub check_driver
 {
     my ($self) = @_;
 
+#note - this pulls in JDBC.  we use require so we can set our CLASSPATH
+#before loading the inline java packages:
+require JDBC;
+require Inline::Java;
+
     #initialize our driver class:
     eval {
         JDBC->load_driver($self->jdbcDriver());
     };
 
     if ($@) {
-        if (caught("java.lang.ClassNotFoundException")){
+        if (&Inline::Java::caught("java.lang.ClassNotFoundException")){
             my $msg = $@->getMessage() ;
             printf STDERR "%s[check_driver]:  Java exception: on JDBC->load_driver(%s): '%s'\n",$pkgname, $self->jdbcDriver(), $msg;
             #xx = Class.forName(this.mDRIVER).toString();
@@ -363,7 +371,7 @@ sub sql_init_connection
     };
 
     if ($@) {
-        if (caught("java.sql.SQLException")){
+        if (&Inline::Java::caught("java.sql.SQLException")){
             my $msg = $@->getMessage() ;
             printf STDERR "%s[sql_init_connection]:  Java exception: on connect: '%s'\n", $pkgname, $msg;
         } else {
@@ -392,7 +400,7 @@ sub sql_close_connection
     };
 
     if ($@) {
-        if (caught("java.sql.SQLException")){
+        if (&Inline::Java::caught("java.sql.SQLException")){
             my $msg = $@->getMessage() ;
             printf STDERR "%s[sql_close_connection]:  Java exception: on connect: '%s'\n", $pkgname, $msg;
         } else {
@@ -621,7 +629,7 @@ sub showIndicesCommand
     };
 
     if ($@) {
-        if (caught("java.sql.SQLException")){
+        if (&Inline::Java::caught("java.sql.SQLException")){
             my $msg = $@->getMessage() ;
             printf STDERR "%s[showIndicesCommand]:  Java exception: '%s'\n", $pkgname, $msg;
         } else {
@@ -723,7 +731,7 @@ sub showTableCommand
     };
 
     if ($@) {
-        if (caught("java.sql.SQLException")){
+        if (&Inline::Java::caught("java.sql.SQLException")){
             my $msg = $@->getMessage() ;
             printf STDERR "%s[showTableCommand]:  Java exception: '%s'\n", $pkgname, $msg;
         } else {
@@ -764,7 +772,7 @@ sub showTablesCommand
     };
 
     if ($@) {
-        if (caught("java.sql.SQLException")){
+        if (&Inline::Java::caught("java.sql.SQLException")){
             my $msg = $@->getMessage() ;
             printf STDERR "%s[showTablesCommand]:  Java exception: '%s'\n", $pkgname, $msg;
         } else {
@@ -957,7 +965,7 @@ sub columnExcludeMap
     };
 
     if ($@) {
-        if (caught("java.sql.SQLException")){
+        if (&Inline::Java::caught("java.sql.SQLException")){
             my $msg = $@->getMessage() ;
             printf STDERR "%s[columnExcludeMap]:  Java exception: '%s'\n", $pkgname, $msg;
         } else {
@@ -992,7 +1000,7 @@ sub getColumns
     };
 
     if ($@) {
-        if (caught("java.sql.SQLException")){
+        if (&Inline::Java::caught("java.sql.SQLException")){
             my $msg = $@->getMessage() ;
             printf STDERR "%s[getColumns]:  Java exception: '%s'\n", $pkgname, $msg;
         } else {
@@ -1023,7 +1031,7 @@ sub getTableName
     };
 
     if ($@) {
-        if (caught("java.sql.SQLException")){
+        if (&Inline::Java::caught("java.sql.SQLException")){
             my $msg = $@->getMessage() ;
             printf STDERR "%s[getTableName]:  Java exception: '%s'\n", $pkgname, $msg;
         } else {
@@ -1055,7 +1063,7 @@ sub getColumnSizes
     };
 
     if ($@) {
-        if (caught("java.sql.SQLException")){
+        if (&Inline::Java::caught("java.sql.SQLException")){
             my $msg = $@->getMessage() ;
             printf STDERR "%s[getColumnSizes]:  Java exception: '%s'\n", $pkgname, $msg;
         } else {
@@ -1099,7 +1107,7 @@ sub getRow
     };
 
     if ($@) {
-        if (caught("java.sql.SQLException")){
+        if (&Inline::Java::caught("java.sql.SQLException")){
             my $msg = $@->getMessage() ;
             printf STDERR "%s[getRow]:  Java exception: '%s'\n", $pkgname, $msg;
         } else {

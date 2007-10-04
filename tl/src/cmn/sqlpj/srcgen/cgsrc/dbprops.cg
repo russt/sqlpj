@@ -2,7 +2,11 @@
 #dbprops.cg - generate connection property files for all of our test instances
 #
 
-%include build_setup.defs
+%if $NO_DBPROPS	%return Skipping dbprops ...
+
+%ifndef BUILD_SETUP_COMPLETE %include ../build_setup.defs
+%ifdef DEBUG %echo ${CG_INFILE}:  CG_ROOT is $CG_ROOT
+
 %include dbprops.defs
 
 dbprop_template := << EOF

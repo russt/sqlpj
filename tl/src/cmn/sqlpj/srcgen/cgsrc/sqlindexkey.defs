@@ -3,7 +3,7 @@
 #
 
 #allows us to run stand-alone:
-%ifndef CG_ROOT %include ../build_setup.defs
+%ifdef BUILD_SETUP_COMPLETE %include build_setup.defs
 
 { ## header section
 PL_PACKAGE = $SQLINDEXKEY_PACKAGE
@@ -12,10 +12,14 @@ PL_PACKAGE_DESCRIPTION = A single key attribute associated with an SQL index
 #not a base class - use standard constuctor name:
 PL_CONSTRUCTOR_NAME = new
 
-PL_PKG_IMPORTS := << EOF
-use {=SQLCOLUMN_PACKAGE=};
+{
+PL_EXTERN_PKG_IMPORTS =
+PL_PKG_IMPORTS = << EOF
+use $SQLCOLUMN_PACKAGE;
 EOF
-%evalmacro PL_PKG_IMPORTS PL_PKG_IMPORTS
+%if    $GEN_ONE_MODULE   PL_PKG_IMPORTS = $PL_EXTERN_PKG_IMPORTS
+%ifnot $GEN_ONE_MODULE   PL_PKG_IMPORTS = $PL_EXTERN_PKG_IMPORTS$PL_PKG_IMPORTS
+}
 
 PL_PKG_ATTRIBUTES := << EOF
 EOF
