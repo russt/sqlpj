@@ -1,0 +1,25 @@
+You can find the info in ResultSetMetaData. I use something like this.
+
+
+
+
+private Set<String> getAutoIncrementColumns(Connection conn, String tblName) throws SQLException {
+    Statement s = conn.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
+
+    ResultSet rs = s.executeQuery("SELECT * FROM " + tblName + " WHERE 1 = 0");
+
+    ResultSetMetaData meta = rs.getMetaData();
+
+    int columnCount = meta.getColumnCount();
+
+    Set<String> results = new HashSet<String>();
+
+    for (int i = 1; i <= columnCount; i++) {
+        if (meta.isAutoIncrement(i)) {
+            String colName = meta.getColumnName(i);
+            results.add(colName);
+        }
+    }
+
+    return results;
+}
