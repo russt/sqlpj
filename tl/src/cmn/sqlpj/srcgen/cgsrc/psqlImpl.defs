@@ -46,6 +46,9 @@ PL_OBJ_ATTRIBUTES := << EOF
 'mMetaData'    => undef,
 'mMetaFuncs'    => undef,
 'mDatabaseName' => undef,
+'mDatabaseProductName' => undef,
+'mIsOracle' => undef,
+'mIsMysql' => undef,
 'mSqlTables'    => undef,      #handle to tables object for this connection
 'mXmlDisplay'   => 0,          #if true, display result-sets as sql/xml
 'mPathSeparator' => $cfg->getPathSeparator(),
@@ -75,6 +78,12 @@ PL_ATTRIBUTE_NAME = MetaData
 PL_ATTRIBUTE_NAME = JdbcUrl
 %evalmacro >> getset_methods pl_getset
 PL_ATTRIBUTE_NAME = DatabaseName
+%evalmacro >> getset_methods pl_getset
+PL_ATTRIBUTE_NAME = DatabaseProductName
+%evalmacro >> getset_methods pl_getset
+PL_ATTRIBUTE_NAME = IsOracle
+%evalmacro >> getset_methods pl_getset
+PL_ATTRIBUTE_NAME = IsMysql
 %evalmacro >> getset_methods pl_getset
 PL_ATTRIBUTE_NAME = SqlTables
 %evalmacro >> getset_methods pl_getset
@@ -130,6 +139,7 @@ sub sqlsession
         #local commands:
         if ($self->localCommand($lbuf)) {
             print $self->prompt();
+            $sqlbuf = "";    #clear the buffer:
             next;
         }
 
@@ -166,7 +176,10 @@ sub sql_exec
 {
     my ($self, $sqlbuf) = @_;
 
-#printf STDERR "sql_exec: buf='%s'\n", $sqlbuf;
+    #ensure no semi-colon(s) at end of buffer:
+    $sqlbuf =~ s/;[;\s]*$//;
+
+printf STDERR "sql_exec: buf='%s'\n", $sqlbuf;
 
     my $stmt = undef;
     my $con  = $self->getConnection();
@@ -366,8 +379,24 @@ sub sql_init_connection
         #also set a handle for DatabaseMetaData:
         $self->setMetaData( $self->getConnection()->getMetaData() );
 
-        #set database name from connection url:
-        $self->setDatabaseName( &getDbnameFromUrl($self->getJdbcUrl()) );
+        #get DatabaseProductName from meta data:
+        $self->setDatabaseProductName( $self->getMetaData()->getDatabaseProductName() );
+
+        if ($self->getDatabaseProductName() =~ /MySQL/i ) {
+            $self->setIsMysql(1);
+            $self->setIsOracle(0);
+
+            #set database name from connection url:  relies on $self->getDatabaseProductName()):
+            $self->setDatabaseName( &getDbnameFromUrl($self->getJdbcUrl()) );
+        } elsif ($self->getDatabaseProductName() =~ /Oracle/i ) {
+            $self->setIsMysql(0);
+            $self->setIsOracle(1);
+
+            #the database name is really the "schema" name in oracle.
+            $self->setDatabaseName( $self->user() );
+        }
+
+        $self->setDatabaseProductName( $self->getMetaData()->getDatabaseProductName() );
     };
 
     if ($@) {
@@ -379,6 +408,8 @@ sub sql_init_connection
         }
         return 0;
     }
+
+printf "isOracle=%d isMySql=%d\n", $self->getIsOracle(), $self->getIsMysql();
 
     #init or re-init our tables object:
     $self->setSqlTables( new {=SQLTABLES_PACKAGE=}($self->getMetaData(), $self->getDatabaseName()) );
@@ -589,7 +620,11 @@ sub showDataBase
 {
     my ($self, $buf) = @_;
 
-    $self->sql_exec("select DATABASE()");
+    if ($self->getIsOracle()) {
+        printf "%s\n", $self->getDatabaseName();
+    } else {
+        $self->sql_exec("select DATABASE()");
+    }
 }
 
 sub showIndicesCommand
@@ -644,10 +679,15 @@ sub showIndicesCommand
 sub showTableCommand
 #implement the table command, which shows information about a single table
 #Usage:  table table_name
+#return 1 if we handled the command, otherwise 0.
 {
     my ($self, $args) = @_;
 
     my ($tblname, $dbname) = split(/\s+/, $args);
+
+    if ($self->getIsOracle()) {
+        return showTableCommandOracle($self, $tblname, $dbname);
+    }
 
     my @excludenames = (
         "TABLE_CAT",
@@ -737,22 +777,27 @@ sub showTableCommand
         } else {
             printf STDERR "%s[showTableCommand]:  ERROR: '%s'\n",$pkgname, $@;
         }
-        return;
+        return 1;  #we handled the command, even if we did get an exception
     }
 
     $self->displayResultSet($rseta, &columnExcludeMap($rseta, @excludenames ));
     $self->displayResultSet($rsetb, &columnExcludeMap($rsetb, @excludenamesb));
     $self->displayResultSet($rsetc, &columnExcludeMap($rsetc, @excludenamesc));
+
+    return 1;
 }
 
 sub showTablesCommand
 #implement the tables command, which shows information about tables
+#return 1 if we handled the command, otherwise 0.
 {
     my ($self, $dbname) = @_;
-#'getTables(String catalog, String schemaPattern, String tableNamePattern, String types[])'  => 'ResultSet',
-#'getSuperTables(String catalog, String schemaPattern, String tableNamePattern)'  => 'ResultSet',
 
     my $dbMetaData = $self->getMetaData();
+
+    if ($self->getIsOracle()) {
+        return showTablesCommandOracle($self, $dbname);
+    }
 
     my $rseta = undef;
 
@@ -763,6 +808,9 @@ sub showTablesCommand
         "TABLE_TYPE",
         "REMARKS",
     );
+
+#getTables(String catalog, String schemaPattern, String tableNamePattern, String types[])'  => 'ResultSet',
+#getSuperTables(String catalog, String schemaPattern, String tableNamePattern)'  => 'ResultSet',
 
     #show the tables from the named database:
     eval {
@@ -778,10 +826,38 @@ sub showTablesCommand
         } else {
             printf STDERR "%s[showTablesCommand]:  ERROR: '%s'\n",$pkgname, $@;
         }
-        return;
+        return 1;  #we handled the command, even if we did get an exception
     }
 
     $self->displayResultSet($rseta, &columnExcludeMap($rseta, @excludenames));
+    return 1;
+}
+
+sub showTablesCommandOracle
+#implement the tables command for ORACLE databases
+{
+    my ($self, $dbname) = @_;
+
+    $self->sql_exec("select table_name from USER_CATALOG");
+
+    return 1;
+}
+
+sub showTableCommandOracle
+#implement the table command for oracle.
+#Usage:  table table_name
+#return 1 if we handled the command, otherwise 0.
+{
+    my ($self, $tblname, $dbname) = @_;
+
+    my $query = sprintf(
+                    "select TABLE_NAME, COLUMN_NAME, DATA_TYPE from ALL_TAB_COLUMNS where TABLE_NAME = '%s'",
+                    $tblname
+                );
+
+    $self->sql_exec($query);
+
+    return 1;
 }
 
 sub useCommand
@@ -1148,10 +1224,12 @@ sub maxwidth
 }
 
 sub getDbnameFromUrl
+#this only works for mysql.
 {
     my ($url) = @_;
 
     return $1 if ( $url =~ /\/([^\/]+)$/ );
+
     return undef;
 }
 

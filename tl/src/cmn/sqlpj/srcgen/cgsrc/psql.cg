@@ -49,17 +49,10 @@ ECHO_TXT =
 }
 
 {
-    ##### for now, we need to generate this as a separate module so we
-    ##### can set the java CLASSPATH before JDBC is loaded.
-    #_save_GEN_ONE_MODULE = $GEN_ONE_MODULE
-    #GEN_ONE_MODULE = 0
-
     #this is sqlpj implementation:
     PL_PACKAGE = $PSQLIMPL_PACKAGE
     module_defs = psqlImpl.defs
     %call generate_a_module
-
-    #GEN_ONE_MODULE = $_save_GEN_ONE_MODULE
 }
 
 {
