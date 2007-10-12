@@ -932,8 +932,12 @@ sub new
         'mJdbcPassword' => undef,
         'mJdbcPropsFileName' => undef,
         'mVersionNumber' => "1.0",
-        'mVersionDate'   => "15-May-2007",
+        'mVersionDate'   => "12-Oct-2007",
         'mPathSeparator' => undef,
+        'mDebug'         => 0,
+        'mDDebug'        => 0,
+        'mQuiet'         => 0,
+        'mVerbose'       => 0,
         }, $class;
 
     #post-attribute init after we bless our $self (allows use of accessor methods):
@@ -1153,6 +1157,66 @@ sub setPrompt
     return $self->{'mPrompt'};
 }
 
+sub getDebug
+#return value of Debug
+{
+    my ($self) = @_;
+    return $self->{'mDebug'};
+}
+
+sub setDebug
+#set value of Debug and return value.
+{
+    my ($self, $value) = @_;
+    $self->{'mDebug'} = $value;
+    return $self->{'mDebug'};
+}
+
+sub getDDebug
+#return value of DDebug
+{
+    my ($self) = @_;
+    return $self->{'mDDebug'};
+}
+
+sub setDDebug
+#set value of DDebug and return value.
+{
+    my ($self, $value) = @_;
+    $self->{'mDDebug'} = $value;
+    return $self->{'mDDebug'};
+}
+
+sub getVerbose
+#return value of Verbose
+{
+    my ($self) = @_;
+    return $self->{'mVerbose'};
+}
+
+sub setVerbose
+#set value of Verbose and return value.
+{
+    my ($self, $value) = @_;
+    $self->{'mVerbose'} = $value;
+    return $self->{'mVerbose'};
+}
+
+sub getQuiet
+#return value of Quiet
+{
+    my ($self) = @_;
+    return $self->{'mQuiet'};
+}
+
+sub setQuiet
+#set value of Quiet and return value.
+{
+    my ($self, $value) = @_;
+    $self->{'mQuiet'} = $value;
+    return $self->{'mQuiet'};
+}
+
 sub versionNumber
 #return value of mVersionNumber
 {
@@ -1184,6 +1248,7 @@ my $pkgname = __PACKAGE__;
 
 #package variables:
 my $mPROMPT = $pkgname . "> ";
+my ($VERBOSE, $DEBUG, $DDEBUG, $QUIET) = (0,0,0,0);
 
 sub new
 {
@@ -1207,12 +1272,20 @@ sub new
         'mMetaData'    => undef,
         'mMetaFuncs'    => undef,
         'mDatabaseName' => undef,
+        'mDatabaseProductName' => undef,
+        'mIsOracle' => undef,
+        'mIsMysql' => undef,
         'mSqlTables'    => undef,      #handle to tables object for this connection
         'mXmlDisplay'   => 0,          #if true, display result-sets as sql/xml
         'mPathSeparator' => $cfg->getPathSeparator(),
         }, $class;
 
     #post-attribute init after we bless our $self (allows use of accessor methods):
+    $DEBUG   = $cfg->getDebug();
+    $DDEBUG  = $cfg->getDDebug();
+    $QUIET   = $cfg->getQuiet();
+    $VERBOSE = $cfg->getVerbose();
+
     #read in database meta-function interface definitions:
     %{$self->{'mMetaFuncs'}}      = (
         'allProceduresAreCallable()'  => 'boolean',
@@ -1417,6 +1490,7 @@ sub sqlsession
         #local commands:
         if ($self->localCommand($lbuf)) {
             print $self->prompt();
+            $sqlbuf = "";    #clear the buffer:
             next;
         }
 
@@ -1453,7 +1527,10 @@ sub sql_exec
 {
     my ($self, $sqlbuf) = @_;
 
-#printf STDERR "sql_exec: buf='%s'\n", $sqlbuf;
+    #ensure no semi-colon(s) at end of buffer:
+    $sqlbuf =~ s/;[;\s]*$//;
+
+    printf STDERR "sql_exec: buf='%s'\n", $sqlbuf if ($DEBUG);
 
     my $stmt = undef;
     my $con  = $self->getConnection();
@@ -1653,8 +1730,24 @@ sub sql_init_connection
         #also set a handle for DatabaseMetaData:
         $self->setMetaData( $self->getConnection()->getMetaData() );
 
-        #set database name from connection url:
-        $self->setDatabaseName( &getDbnameFromUrl($self->getJdbcUrl()) );
+        #get DatabaseProductName from meta data:
+        $self->setDatabaseProductName( $self->getMetaData()->getDatabaseProductName() );
+
+        if ($self->getDatabaseProductName() =~ /MySQL/i ) {
+            $self->setIsMysql(1);
+            $self->setIsOracle(0);
+
+            #set database name from connection url:  relies on $self->getDatabaseProductName()):
+            $self->setDatabaseName( &getDbnameFromUrl($self->getJdbcUrl()) );
+        } elsif ($self->getDatabaseProductName() =~ /Oracle/i ) {
+            $self->setIsMysql(0);
+            $self->setIsOracle(1);
+
+            #the database name is really the "schema" name in oracle.
+            $self->setDatabaseName( $self->user() );
+        }
+
+        $self->setDatabaseProductName( $self->getMetaData()->getDatabaseProductName() );
     };
 
     if ($@) {
@@ -1666,6 +1759,8 @@ sub sql_init_connection
         }
         return 0;
     }
+
+    printf "isOracle=%d isMySql=%d\n", $self->getIsOracle(), $self->getIsMysql() if ($DEBUG);
 
     #init or re-init our tables object:
     $self->setSqlTables( new sqltables($self->getMetaData(), $self->getDatabaseName()) );
@@ -1876,7 +1971,11 @@ sub showDataBase
 {
     my ($self, $buf) = @_;
 
-    $self->sql_exec("select DATABASE()");
+    if ($self->getIsOracle()) {
+        printf "%s\n", $self->getDatabaseName();
+    } else {
+        $self->sql_exec("select DATABASE()");
+    }
 }
 
 sub showIndicesCommand
@@ -1931,10 +2030,15 @@ sub showIndicesCommand
 sub showTableCommand
 #implement the table command, which shows information about a single table
 #Usage:  table table_name
+#return 1 if we handled the command, otherwise 0.
 {
     my ($self, $args) = @_;
 
     my ($tblname, $dbname) = split(/\s+/, $args);
+
+    if ($self->getIsOracle()) {
+        return showTableCommandOracle($self, $tblname, $dbname);
+    }
 
     my @excludenames = (
         "TABLE_CAT",
@@ -2024,22 +2128,27 @@ sub showTableCommand
         } else {
             printf STDERR "%s[showTableCommand]:  ERROR: '%s'\n",$pkgname, $@;
         }
-        return;
+        return 1;  #we handled the command, even if we did get an exception
     }
 
     $self->displayResultSet($rseta, &columnExcludeMap($rseta, @excludenames ));
     $self->displayResultSet($rsetb, &columnExcludeMap($rsetb, @excludenamesb));
     $self->displayResultSet($rsetc, &columnExcludeMap($rsetc, @excludenamesc));
+
+    return 1;
 }
 
 sub showTablesCommand
 #implement the tables command, which shows information about tables
+#return 1 if we handled the command, otherwise 0.
 {
     my ($self, $dbname) = @_;
-#'getTables(String catalog, String schemaPattern, String tableNamePattern, String types[])'  => 'ResultSet',
-#'getSuperTables(String catalog, String schemaPattern, String tableNamePattern)'  => 'ResultSet',
 
     my $dbMetaData = $self->getMetaData();
+
+    if ($self->getIsOracle()) {
+        return showTablesCommandOracle($self, $dbname);
+    }
 
     my $rseta = undef;
 
@@ -2050,6 +2159,9 @@ sub showTablesCommand
         "TABLE_TYPE",
         "REMARKS",
     );
+
+#getTables(String catalog, String schemaPattern, String tableNamePattern, String types[])'  => 'ResultSet',
+#getSuperTables(String catalog, String schemaPattern, String tableNamePattern)'  => 'ResultSet',
 
     #show the tables from the named database:
     eval {
@@ -2065,10 +2177,38 @@ sub showTablesCommand
         } else {
             printf STDERR "%s[showTablesCommand]:  ERROR: '%s'\n",$pkgname, $@;
         }
-        return;
+        return 1;  #we handled the command, even if we did get an exception
     }
 
     $self->displayResultSet($rseta, &columnExcludeMap($rseta, @excludenames));
+    return 1;
+}
+
+sub showTablesCommandOracle
+#implement the tables command for ORACLE databases
+{
+    my ($self, $dbname) = @_;
+
+    $self->sql_exec("select table_name from USER_CATALOG");
+
+    return 1;
+}
+
+sub showTableCommandOracle
+#implement the table command for oracle.
+#Usage:  table table_name
+#return 1 if we handled the command, otherwise 0.
+{
+    my ($self, $tblname, $dbname) = @_;
+
+    my $query = sprintf(
+                    "select TABLE_NAME, COLUMN_NAME, DATA_TYPE from ALL_TAB_COLUMNS where TABLE_NAME = '%s'",
+                    $tblname
+                );
+
+    $self->sql_exec($query);
+
+    return 1;
 }
 
 sub useCommand
@@ -2264,6 +2404,51 @@ sub setDatabaseName
     my ($self, $value) = @_;
     $self->{'mDatabaseName'} = $value;
     return $self->{'mDatabaseName'};
+}
+
+sub getDatabaseProductName
+#return value of DatabaseProductName
+{
+    my ($self) = @_;
+    return $self->{'mDatabaseProductName'};
+}
+
+sub setDatabaseProductName
+#set value of DatabaseProductName and return value.
+{
+    my ($self, $value) = @_;
+    $self->{'mDatabaseProductName'} = $value;
+    return $self->{'mDatabaseProductName'};
+}
+
+sub getIsOracle
+#return value of IsOracle
+{
+    my ($self) = @_;
+    return $self->{'mIsOracle'};
+}
+
+sub setIsOracle
+#set value of IsOracle and return value.
+{
+    my ($self, $value) = @_;
+    $self->{'mIsOracle'} = $value;
+    return $self->{'mIsOracle'};
+}
+
+sub getIsMysql
+#return value of IsMysql
+{
+    my ($self) = @_;
+    return $self->{'mIsMysql'};
+}
+
+sub setIsMysql
+#set value of IsMysql and return value.
+{
+    my ($self, $value) = @_;
+    $self->{'mIsMysql'} = $value;
+    return $self->{'mIsMysql'};
 }
 
 sub getSqlTables
@@ -2573,10 +2758,12 @@ sub maxwidth
 }
 
 sub getDbnameFromUrl
+#this only works for mysql.
 {
     my ($url) = @_;
 
     return $1 if ( $url =~ /\/([^\/]+)$/ );
+
     return undef;
 }
 
@@ -2786,6 +2973,8 @@ sub parse_args
                 $scfg->getProgName(), $scfg->versionNumber(), $scfg->versionDate();
             $HELPFLAG = 1;    #display version and exit.
             return 0;
+        } elsif ($flag =~ '^-q') {
+            $HELPFLAG = 1;    #display version and exit.
         } elsif ($flag =~ '^-user') {
             # -user name        Username used for connection
             if ($#ARGV+1 > 0 && $ARGV[0] !~ /^-/) {
@@ -2859,6 +3048,12 @@ sub parse_args
 
     #eliminate empty args (this happens on some platforms):
     @ARGV = grep(!/^$/, @ARGV);
+
+    #set debug, verbose options:
+    $scfg->setDebug($DEBUGFLAG);
+    $scfg->setDDebug($DDEBUGFLAG);
+    $scfg->setQuiet($QUIET);
+    $scfg->setVerbose($VERBOSE);
 
     #check the JDBC configuration:
     if (!&checkJdbcSettings($scfg)) {

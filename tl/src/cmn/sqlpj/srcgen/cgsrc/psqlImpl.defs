@@ -25,6 +25,7 @@ EOF
 
 PL_PKG_ATTRIBUTES := << EOF
 my $mPROMPT = $pkgname . "> ";
+my ($VERBOSE, $DEBUG, $DDEBUG, $QUIET) = (0,0,0,0);
 EOF
 #%evalmacro PL_PKG_ATTRIBUTES PL_PKG_ATTRIBUTES
 }
@@ -57,6 +58,11 @@ EOF
 
 #this is for further initialzation of attributes, since hash init cannot be self-referential:
 PL_POST_ATTRIBUTE_INIT := << EOF
+$DEBUG   = $cfg->getDebug();
+$DDEBUG  = $cfg->getDDebug();
+$QUIET   = $cfg->getQuiet();
+$VERBOSE = $cfg->getVerbose();
+
 #read in database meta-function interface definitions:
 %{$self->{'mMetaFuncs'}}      = (
 {=%include dbmeta.defs=}
@@ -179,7 +185,7 @@ sub sql_exec
     #ensure no semi-colon(s) at end of buffer:
     $sqlbuf =~ s/;[;\s]*$//;
 
-printf STDERR "sql_exec: buf='%s'\n", $sqlbuf;
+    printf STDERR "sql_exec: buf='%s'\n", $sqlbuf if ($DEBUG);
 
     my $stmt = undef;
     my $con  = $self->getConnection();
@@ -409,7 +415,7 @@ sub sql_init_connection
         return 0;
     }
 
-printf "isOracle=%d isMySql=%d\n", $self->getIsOracle(), $self->getIsMysql();
+    printf "isOracle=%d isMySql=%d\n", $self->getIsOracle(), $self->getIsMysql() if ($DEBUG);
 
     #init or re-init our tables object:
     $self->setSqlTables( new {=SQLTABLES_PACKAGE=}($self->getMetaData(), $self->getDatabaseName()) );

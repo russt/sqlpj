@@ -180,6 +180,8 @@ PL_PARSE_ARGS_LOOP := << EOF
         $scfg->getProgName(), $scfg->versionNumber(), $scfg->versionDate();
     $HELPFLAG = 1;    #display version and exit.
     return 0;
+} elsif ($flag =~ '^-q') {
+    $HELPFLAG = 1;    #display version and exit.
 } elsif ($flag =~ '^-user') {
     # -user name        Username used for connection
     if ($#ARGV+1 > 0 && $ARGV[0] !~ /^-/) {
@@ -243,6 +245,12 @@ EOF
 } #end of parse arg loop defs
 
 PL_PARSE_ARGS_POST := << EOF
+#set debug, verbose options:
+$scfg->setDebug($DEBUGFLAG);
+$scfg->setDDebug($DDEBUGFLAG);
+$scfg->setQuiet($QUIET);
+$scfg->setVerbose($VERBOSE);
+
 #check the JDBC configuration:
 if (!&checkJdbcSettings($scfg)) {
     printf STDERR "%s:  one or more JDBC connection settings are missing or incomplete - ABORT.\n", $p;

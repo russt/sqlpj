@@ -36,8 +36,12 @@ PL_OBJ_ATTRIBUTES := << EOF
 'mJdbcPassword' => undef,
 'mJdbcPropsFileName' => undef,
 'mVersionNumber' => "1.0",
-'mVersionDate'   => "15-May-2007",
+'mVersionDate'   => "12-Oct-2007",
 'mPathSeparator' => undef,
+'mDebug'         => 0,
+'mDDebug'        => 0,
+'mQuiet'         => 0,
+'mVerbose'       => 0,
 EOF
 #%evalmacro PL_OBJ_ATTRIBUTES PL_OBJ_ATTRIBUTES
 
@@ -70,6 +74,14 @@ PL_ATTRIBUTE_NAME = JdbcPropsFileName
 PL_ATTRIBUTE_NAME = PathSeparator
 %evalmacro >> getset_methods pl_getset
 PL_ATTRIBUTE_NAME = Prompt
+%evalmacro >> getset_methods pl_getset
+PL_ATTRIBUTE_NAME = Debug
+%evalmacro >> getset_methods pl_getset
+PL_ATTRIBUTE_NAME = DDebug
+%evalmacro >> getset_methods pl_getset
+PL_ATTRIBUTE_NAME = Verbose
+%evalmacro >> getset_methods pl_getset
+PL_ATTRIBUTE_NAME = Quiet
 %evalmacro >> getset_methods pl_getset
 
 #generate read-only attributes:
