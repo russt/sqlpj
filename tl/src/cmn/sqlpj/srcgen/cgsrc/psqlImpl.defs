@@ -595,7 +595,7 @@ sub setCommand
             printf STDERR "%s: ERROR: set xml '%s' not recognized - ignored.\n", $pkgname, $buf;
         }
         printf STDOUT "SQL/XML result-sets display %s %s\n",
-            $howsay, $self->getXmlDisplay()? "ON" : "OFF";
+            $howsay, $self->getXmlDisplay()? "ON" : "OFF" unless($QUIET);
     } elsif ($buf  =~ /^csv/i) {
         $buf =~ s/csv\s*//i;
         my $howsay = "remains";
@@ -614,7 +614,7 @@ sub setCommand
         }
 
         printf STDOUT "CSV output %s %s\n",
-            $howsay, $self->getCsvDisplay()? "ON" : "OFF";
+            $howsay, $self->getCsvDisplay()? "ON" : "OFF" unless($QUIET);
     } elsif ($buf  =~ /^headers/i) {
         $buf =~ s/headers\s*//i;
         my $howsay = "remains";
@@ -633,7 +633,7 @@ sub setCommand
         }
 
         printf STDOUT "HEADER output %s %s\n",
-            $howsay, $self->getHeaderSetting()? "ON" : "OFF";
+            $howsay, $self->getHeaderSetting()? "ON" : "OFF" unless($QUIET);
     } else {
         printf STDERR "%s: ERROR: set '%s' not recognized - ignored.\n", $pkgname, $buf;
     }

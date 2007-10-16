@@ -181,7 +181,7 @@ PL_PARSE_ARGS_LOOP := << EOF
     $HELPFLAG = 1;    #display version and exit.
     return 0;
 } elsif ($flag =~ '^-q') {
-    $HELPFLAG = 1;    #display version and exit.
+    $QUIET = 1;
 } elsif ($flag =~ '^-user') {
     # -user name        Username used for connection
     if ($#ARGV+1 > 0 && $ARGV[0] !~ /^-/) {
