@@ -52,6 +52,8 @@ PL_OBJ_ATTRIBUTES := << EOF
 'mIsMysql' => undef,
 'mSqlTables'    => undef,      #handle to tables object for this connection
 'mXmlDisplay'   => 0,          #if true, display result-sets as sql/xml
+'mCsvDisplay'   => 0,          #if true, display result-sets as comma-separated-data
+'mHeaderSetting' => 1,         #if true, display table headers with data (default is on)
 'mPathSeparator' => $cfg->getPathSeparator(),
 EOF
 #%evalmacro PL_OBJ_ATTRIBUTES PL_OBJ_ATTRIBUTES
@@ -94,6 +96,10 @@ PL_ATTRIBUTE_NAME = IsMysql
 PL_ATTRIBUTE_NAME = SqlTables
 %evalmacro >> getset_methods pl_getset
 PL_ATTRIBUTE_NAME = XmlDisplay
+%evalmacro >> getset_methods pl_getset
+PL_ATTRIBUTE_NAME = CsvDisplay
+%evalmacro >> getset_methods pl_getset
+PL_ATTRIBUTE_NAME = HeaderSetting
 %evalmacro >> getset_methods pl_getset
 
 #generate read-only attributes:
@@ -285,8 +291,10 @@ sub displayResultSet
     #we first make a pass to get all the rows into memory:
     my @allrows = ();
     
-    #save column headers:
-    push @allrows, [&getColumns($rset, @colmap)];
+#printf "getHeaderSetting=%d\n", $self->getHeaderSetting();
+
+    #save column headers unless we are not displaying::
+    push @allrows, [&getColumns($rset, @colmap)] if ($self->getHeaderSetting());
 
     my $tableName = &getTableName($rset);
 
@@ -321,19 +329,23 @@ sub displayResultSet
 
 #printf STDERR "fmt='%s' divider=\n%s\n", $fmt, $divider;
 
+    my $rowref = undef;
+
     #######
     #column headers:
     #######
-    my $rowref =  shift(@allrows);
-    print $divider;
-    printf $fmt. "\n", @{$rowref};
-    print $divider;
+    if ($self->getHeaderSetting()) {
+        $rowref =  shift(@allrows);
+        print $divider;
+        printf $fmt. "\n", @{$rowref};
+        print $divider;
+    }
 
     #display data:
     while (defined($rowref =  shift(@allrows))) {
         printf $fmt. "\n", @{$rowref};
     }
-    print $divider;
+    print $divider if ($self->getHeaderSetting());
 
     return 1;    #success
 }
@@ -498,6 +510,12 @@ sub helpCommand
 Local commands are:
  help                 - show this message.
 
+ set csv [on]         - output tables as comma-separated data.
+ set csv off          - turn off csv output display.
+
+ set headers [on]     - output table header rows with data
+ set headers off      - turn off output table headers
+
  set xml [on]         - output result-sets in sql/xml form.
  set xml off          - turn off xml output of result-sets.
 
@@ -578,6 +596,44 @@ sub setCommand
         }
         printf STDOUT "SQL/XML result-sets display %s %s\n",
             $howsay, $self->getXmlDisplay()? "ON" : "OFF";
+    } elsif ($buf  =~ /^csv/i) {
+        $buf =~ s/csv\s*//i;
+        my $howsay = "remains";
+        if ($buf eq "" || $buf =~ /^on/i) {
+            if (!$self->getCsvDisplay()) {
+                $self->setCsvDisplay(1);
+                $howsay = "is now";
+            }
+        } elsif ($buf =~ /^off/i) {
+            if ($self->getCsvDisplay()) {
+                $self->setCsvDisplay(0);
+                $howsay = "is now";
+            }
+        } else {
+            printf STDERR "%s: ERROR: set csv '%s' not recognized - ignored.\n", $pkgname, $buf;
+        }
+
+        printf STDOUT "CSV output %s %s\n",
+            $howsay, $self->getCsvDisplay()? "ON" : "OFF";
+    } elsif ($buf  =~ /^headers/i) {
+        $buf =~ s/headers\s*//i;
+        my $howsay = "remains";
+        if ($buf eq "" || $buf =~ /^on/i) {
+            if (!$self->getHeaderSetting()) {
+                $self->setHeaderSetting(1);
+                $howsay = "is now";
+            }
+        } elsif ($buf =~ /^off/i) {
+            if ($self->getHeaderSetting()) {
+                $self->setHeaderSetting(0);
+                $howsay = "is now";
+            }
+        } else {
+            printf STDERR "%s: ERROR: set headers '%s' not recognized - ignored.\n", $pkgname, $buf;
+        }
+
+        printf STDOUT "HEADER output %s %s\n",
+            $howsay, $self->getHeaderSetting()? "ON" : "OFF";
     } else {
         printf STDERR "%s: ERROR: set '%s' not recognized - ignored.\n", $pkgname, $buf;
     }
