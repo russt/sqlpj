@@ -932,7 +932,7 @@ sub new
         'mJdbcPassword' => undef,
         'mJdbcPropsFileName' => undef,
         'mVersionNumber' => "1.0",
-        'mVersionDate'   => "12-Oct-2007",
+        'mVersionDate'   => "16-Oct-2007",
         'mPathSeparator' => undef,
         'mDebug'         => 0,
         'mDDebug'        => 0,
@@ -1277,6 +1277,8 @@ sub new
         'mIsMysql' => undef,
         'mSqlTables'    => undef,      #handle to tables object for this connection
         'mXmlDisplay'   => 0,          #if true, display result-sets as sql/xml
+        'mCsvDisplay'   => 0,          #if true, display result-sets as comma-separated-data
+        'mHeaderSetting' => 1,         #if true, display table headers with data (default is on)
         'mPathSeparator' => $cfg->getPathSeparator(),
         }, $class;
 
@@ -1630,8 +1632,10 @@ sub displayResultSet
     #we first make a pass to get all the rows into memory:
     my @allrows = ();
     
-    #save column headers:
-    push @allrows, [&getColumns($rset, @colmap)];
+#printf "getHeaderSetting=%d\n", $self->getHeaderSetting();
+
+    #save column headers unless we are not displaying::
+    push @allrows, [&getColumns($rset, @colmap)] if ($self->getHeaderSetting());
 
     my $tableName = &getTableName($rset);
 
@@ -1666,19 +1670,23 @@ sub displayResultSet
 
 #printf STDERR "fmt='%s' divider=\n%s\n", $fmt, $divider;
 
+    my $rowref = undef;
+
     #######
     #column headers:
     #######
-    my $rowref =  shift(@allrows);
-    print $divider;
-    printf $fmt. "\n", @{$rowref};
-    print $divider;
+    if ($self->getHeaderSetting()) {
+        $rowref =  shift(@allrows);
+        print $divider;
+        printf $fmt. "\n", @{$rowref};
+        print $divider;
+    }
 
     #display data:
     while (defined($rowref =  shift(@allrows))) {
         printf $fmt. "\n", @{$rowref};
     }
-    print $divider;
+    print $divider if ($self->getHeaderSetting());
 
     return 1;    #success
 }
@@ -1843,6 +1851,12 @@ sub helpCommand
 Local commands are:
  help                 - show this message.
 
+ set csv [on]         - output tables as comma-separated data.
+ set csv off          - turn off csv output display.
+
+ set headers [on]     - output table header rows with data
+ set headers off      - turn off output table headers
+
  set xml [on]         - output result-sets in sql/xml form.
  set xml off          - turn off xml output of result-sets.
 
@@ -1922,7 +1936,45 @@ sub setCommand
             printf STDERR "%s: ERROR: set xml '%s' not recognized - ignored.\n", $pkgname, $buf;
         }
         printf STDOUT "SQL/XML result-sets display %s %s\n",
-            $howsay, $self->getXmlDisplay()? "ON" : "OFF";
+            $howsay, $self->getXmlDisplay()? "ON" : "OFF" unless($QUIET);
+    } elsif ($buf  =~ /^csv/i) {
+        $buf =~ s/csv\s*//i;
+        my $howsay = "remains";
+        if ($buf eq "" || $buf =~ /^on/i) {
+            if (!$self->getCsvDisplay()) {
+                $self->setCsvDisplay(1);
+                $howsay = "is now";
+            }
+        } elsif ($buf =~ /^off/i) {
+            if ($self->getCsvDisplay()) {
+                $self->setCsvDisplay(0);
+                $howsay = "is now";
+            }
+        } else {
+            printf STDERR "%s: ERROR: set csv '%s' not recognized - ignored.\n", $pkgname, $buf;
+        }
+
+        printf STDOUT "CSV output %s %s\n",
+            $howsay, $self->getCsvDisplay()? "ON" : "OFF" unless($QUIET);
+    } elsif ($buf  =~ /^headers/i) {
+        $buf =~ s/headers\s*//i;
+        my $howsay = "remains";
+        if ($buf eq "" || $buf =~ /^on/i) {
+            if (!$self->getHeaderSetting()) {
+                $self->setHeaderSetting(1);
+                $howsay = "is now";
+            }
+        } elsif ($buf =~ /^off/i) {
+            if ($self->getHeaderSetting()) {
+                $self->setHeaderSetting(0);
+                $howsay = "is now";
+            }
+        } else {
+            printf STDERR "%s: ERROR: set headers '%s' not recognized - ignored.\n", $pkgname, $buf;
+        }
+
+        printf STDOUT "HEADER output %s %s\n",
+            $howsay, $self->getHeaderSetting()? "ON" : "OFF" unless($QUIET);
     } else {
         printf STDERR "%s: ERROR: set '%s' not recognized - ignored.\n", $pkgname, $buf;
     }
@@ -2481,6 +2533,36 @@ sub setXmlDisplay
     return $self->{'mXmlDisplay'};
 }
 
+sub getCsvDisplay
+#return value of CsvDisplay
+{
+    my ($self) = @_;
+    return $self->{'mCsvDisplay'};
+}
+
+sub setCsvDisplay
+#set value of CsvDisplay and return value.
+{
+    my ($self, $value) = @_;
+    $self->{'mCsvDisplay'} = $value;
+    return $self->{'mCsvDisplay'};
+}
+
+sub getHeaderSetting
+#return value of HeaderSetting
+{
+    my ($self) = @_;
+    return $self->{'mHeaderSetting'};
+}
+
+sub setHeaderSetting
+#set value of HeaderSetting and return value.
+{
+    my ($self, $value) = @_;
+    $self->{'mHeaderSetting'} = $value;
+    return $self->{'mHeaderSetting'};
+}
+
 sub jdbcClassPath
 #return value of mJdbcClassPath
 {
@@ -2974,7 +3056,7 @@ sub parse_args
             $HELPFLAG = 1;    #display version and exit.
             return 0;
         } elsif ($flag =~ '^-q') {
-            $HELPFLAG = 1;    #display version and exit.
+            $QUIET = 1;
         } elsif ($flag =~ '^-user') {
             # -user name        Username used for connection
             if ($#ARGV+1 > 0 && $ARGV[0] !~ /^-/) {
