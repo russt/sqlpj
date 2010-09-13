@@ -99,7 +99,7 @@ sub keyCreateStrWithLength
     return sprintf("%s%s", $self->qname(), $lenstr);
 }
 
-{=getset_methods=}
+{=$getset_methods:rtrim=}
 EOF
 
 %evalmacro PL_PKG_METHODS PL_PKG_METHODS

@@ -22,10 +22,11 @@
 
 #
 # @(#)sqlpj.pl
-# Copyright 2004-2007 Sun Microsystems, Inc. All Rights Reserved.
+# Copyright 2007-2010 Russ Tremain. All Rights Reserved.
 #
 # END_HEADER - DO NOT EDIT
 #
+
 {
 #
 #sqlindex - A single SQL index associated with a table
@@ -45,7 +46,7 @@ sub new
     my ($invocant) = @_;
     shift @_;
 
-    #allows this constructer to be invoked with reference or with explicit package name:
+    #allows this constructor to be invoked with reference or with explicit package name:
     my $class = ref($invocant) || $invocant;
 
     my ($tblname, $iname, $isPrimary, $isUnique) = @_;
@@ -158,7 +159,6 @@ sub keyNames
     return @{$self->{'mKeyNames'}};
 }
 
-
 1;
 } #end of sqlindex
 {
@@ -180,7 +180,7 @@ sub new
     my ($invocant) = @_;
     shift @_;
 
-    #allows this constructer to be invoked with reference or with explicit package name:
+    #allows this constructor to be invoked with reference or with explicit package name:
     my $class = ref($invocant) || $invocant;
 
     my ($idxname, $keyname, $colobj) = @_;
@@ -255,7 +255,6 @@ sub columnObj
     return $self->{'mColumnObj'};
 }
 
-
 1;
 } #end of sqlindexkey
 {
@@ -277,7 +276,7 @@ sub new
     my ($invocant) = @_;
     shift @_;
 
-    #allows this constructer to be invoked with reference or with explicit package name:
+    #allows this constructor to be invoked with reference or with explicit package name:
     my $class = ref($invocant) || $invocant;
 
     my ($tblname, $cname, $ctype, $csize, $cnullable, $cdefault, $decimalDigits, $isAutoIncrement) = @_;
@@ -409,7 +408,6 @@ sub isAutoIncrement
     return $self->{'mIsAutoIncrement'};
 }
 
-
 1;
 } #end of sqlcolumn
 {
@@ -431,7 +429,7 @@ sub new
     my ($invocant) = @_;
     shift @_;
 
-    #allows this constructer to be invoked with reference or with explicit package name:
+    #allows this constructor to be invoked with reference or with explicit package name:
     my $class = ref($invocant) || $invocant;
 
     my ($jdbc_metadata, $dbname, $tblname) = @_;
@@ -762,8 +760,6 @@ sub indexNames
     return @{$self->{'mIndexNames'}};
 }
 
-
-
 1;
 } #end of sqltable
 {
@@ -785,7 +781,7 @@ sub new
     my ($invocant) = @_;
     shift @_;
 
-    #allows this constructer to be invoked with reference or with explicit package name:
+    #allows this constructor to be invoked with reference or with explicit package name:
     my $class = ref($invocant) || $invocant;
 
     my ($jdbc_metadata, $dbname) = @_;
@@ -849,7 +845,6 @@ sub databaseName
     my ($self) = @_;
     return $self->{'mDatabaseName'};
 }
-
 
 #######
 #static methods
@@ -917,7 +912,7 @@ sub new
     my ($invocant) = @_;
     shift @_;
 
-    #allows this constructer to be invoked with reference or with explicit package name:
+    #allows this constructor to be invoked with reference or with explicit package name:
     my $class = ref($invocant) || $invocant;
 
 
@@ -1231,7 +1226,6 @@ sub versionDate
     return $self->{'mVersionDate'};
 }
 
-
 1;
 } #end of pkgconfig
 {
@@ -1255,7 +1249,7 @@ sub new
     my ($invocant) = @_;
     shift @_;
 
-    #allows this constructer to be invoked with reference or with explicit package name:
+    #allows this constructor to be invoked with reference or with explicit package name:
     my $class = ref($invocant) || $invocant;
 
     my ($cfg) = @_;
@@ -2611,7 +2605,6 @@ sub metaFuncs
     my ($self) = @_;
     return $self->{'mMetaFuncs'};
 }
-
 
 #######
 #static class methods

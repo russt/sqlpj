@@ -340,8 +340,7 @@ sub showCreateTableCommon
 
 }
 
-{=getset_methods=}
-
+{=$getset_methods:rtrim=}
 EOF
 
 %evalmacro PL_PKG_METHODS PL_PKG_METHODS

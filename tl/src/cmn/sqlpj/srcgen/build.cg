@@ -16,8 +16,15 @@
 %ifndef NO_DBPROPS	NO_DBPROPS = 1
 %ifndef GEN_ONE_MODULE	GEN_ONE_MODULE = 1
 
+%pragma trim_multiline_rnewline 1
+
 %include build_setup.defs
 %include cgsrc/psql.cg
+
+COPYRIGHT_YEARS  = 2007-2010
+COPYRIGHT_HOLDER = Russ Tremain
+%export COPYRIGHT_YEARS
+%export COPYRIGHT_HOLDER
 
 %echo Adding LICENSE header to $CG_ROOT/*.pl ...
 %shell signsrc $CG_ROOT/*.pl

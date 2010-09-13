@@ -1057,7 +1057,7 @@ sub callMetaFunc
 #accessor methods for {=PL_PACKAGE=} object attributes:
 #########
 
-{=getset_methods=}
+{=$getset_methods:rtrim=}
 
 #######
 #static class methods

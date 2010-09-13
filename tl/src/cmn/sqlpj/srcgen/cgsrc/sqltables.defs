@@ -88,7 +88,7 @@ sub tableByName
     return $self->{'mTablesByName'}->{$tblname};
 }
 
-{=getset_methods=}
+{=$getset_methods:rtrim=}
 
 #######
 #static methods
