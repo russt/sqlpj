@@ -48,8 +48,8 @@ PL_OBJ_ATTRIBUTES := << EOF
 'mMetaFuncs'    => undef,
 'mDatabaseName' => undef,
 'mDatabaseProductName' => undef,
-'mIsOracle' => undef,
-'mIsMysql' => undef,
+'mIsOracle' => 0,
+'mIsMysql' => 0,
 'mSqlTables'    => undef,      #handle to tables object for this connection
 'mXmlDisplay'   => 0,          #if true, display result-sets as sql/xml
 'mCsvDisplay'   => 0,          #if true, display result-sets as comma-separated-data
@@ -388,6 +388,8 @@ sub sql_init_connection
 
     #make sure currentl connection is closed:
     $self->sql_close_connection();
+
+printf STDERR "jdbcDriver='%s getJdbcUrl='%s' user='%s' password='%s'\n", $self->jdbcDriver(), $self->getJdbcUrl(), $self->user(), $self->password();
 
     #try to get a connection:
     eval {

@@ -137,7 +137,7 @@ sub parseJdbcPropertiesFile
         #skip comments:
         next if ($prop =~ /^\s*[#\*]/);
 
-        my (@line) = split(/\s*=\s*/, $prop, -1);    #-1 => include trailing null field
+        my (@line) = split(/\s*=\s*/, $prop, 2);    #values (db url) can have "=" in them!  RT 8/30/12
         if ($#line < 1) {
             printf STDERR "%s[%s]:  WARNING: bad record, '%s' in property file, '%s'\n",
                 $self->getProgName(), $pkgname, $prop, $self->getJdbcPropsFileName();
