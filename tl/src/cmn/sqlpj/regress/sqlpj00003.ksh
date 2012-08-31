@@ -10,8 +10,9 @@ SQLCMDS=$SHOW_CREATE_TABLES
  SQLOUT=$DB_CREATE_TESTDB_TABLES
  SQLREF=$REGRESS_SRCROOT/scripts/createinf_ref.sql
 
-sqlpj -props "$INFDB_PROPS" -prompt "" "$SQLCMDS" > "$SQLOUT"
+echo "sqlpj -props $REGRESS_TESTDB_PROPS -prompt  $SQLCMDS > $SQLOUT"
+sqlpj -props "$REGRESS_TESTDB_PROPS" -prompt "" "$SQLCMDS" > "$SQLOUT"
 echo sqlpj status is $?
 
 #diff the output against the reference create script:
-diff $SQLREF $SQLOUT
+#diff $SQLREF $SQLOUT

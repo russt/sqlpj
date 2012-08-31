@@ -6,16 +6,20 @@ echo TESTNAME is $TESTNAME
 . ./regress_defs.ksh
 
 #clean up from previous run:
-rm -rf "$TEST_ROOT"
+rm -rf "$TEST_ROOT" _Inline
 mkdir  "$TEST_ROOT"
 echo MKDIR STATUS is $?
 
-#make sure we have access to the jdbc connection prop files:
-[ ! -r "$INFDB_PROPS"     ] && echo ERROR: missing $INFDB_PROPS
-[ ! -r "$INFTESTDB_PROPS" ] && echo ERROR: missing $INFTESTDB_PROPS
-[ ! -r "$MYSQLDB_PROPS"   ] && echo ERROR: missing $MYSQLDB_PROPS
+#old - this appears to work with JDK 1.5 only!
+#JDBC_CLASSPATH=$REGRESS_SRCROOT/drivers/db-derby-10.1.1.0.jar
 
-#create property file for testdb:
-if [ -r "$INFTESTDB_PROPS" ]; then
-    sed -e "s/inftest/$REGRESS_TESTDB/g" "$INFTESTDB_PROPS" > "$REGRESS_TESTDB_PROPS"
-fi
+echo Creating $REGRESS_TESTDB_PROPS
+cat > "$REGRESS_TESTDB_PROPS" << EOF
+JDBC_CLASSPATH=$REGRESS_SRCROOT/drivers/db-derby-10.9.1.0-lib/lib/derby.jar
+JDBC_DRIVER_CLASS=org.apache.derby.jdbc.EmbeddedDriver
+JDBC_URL=jdbc:derby:derbydb;create=true
+JDBC_USER=test
+JDBC_PASSWORD=test
+EOF
+
+cat $REGRESS_TESTDB_PROPS
