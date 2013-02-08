@@ -1,0 +1,5 @@
+JDBC_CLASSPATH=/Users/russt/proj/rttl/devtools/tl/src/cmn/sqlpj/regress/drivers/derby.jar
+JDBC_DRIVER_CLASS=org.apache.derby.jdbc.EmbeddedDriver
+JDBC_URL=jdbc:derby:derbydb;create=true
+JDBC_USER=test
+JDBC_PASSWORD=test

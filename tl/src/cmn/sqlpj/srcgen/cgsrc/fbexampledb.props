@@ -1,0 +1,15 @@
+#get:  Exception in thread "IJST-#0" java.lang.UnsupportedClassVersionError: Bad version number in .class file
+#JDBC_CLASSPATH=/Users/russt/proj/rttl/devtools/tl/src/cmn/sqlpj/regress/drivers/firebird/jdbc6/jaybird-full-2.2.0.jar
+#JDBC_CLASSPATH=/Users/russt/proj/rttl/devtools/tl/src/cmn/sqlpj/regress/drivers/firebird/jdbc6/jaybird-2.2.0.jar
+
+#get:  Exception in thread "IJST-#0" java.lang.NoClassDefFoundError: javax/resource/ResourceException
+#JDBC_CLASSPATH=/Users/russt/proj/rttl/devtools/tl/src/cmn/sqlpj/regress/drivers/firebird/jdbc5/jaybird-2.2.0.jar
+
+#this is the only one that works!  it has javax/resource/* packages not in the bare driver.
+JDBC_CLASSPATH=/Users/russt/proj/rttl/devtools/tl/src/cmn/sqlpj/regress/drivers/firebird/jdbc5/jaybird-full-2.2.0.jar
+
+JDBC_DRIVER_CLASS=org.firebirdsql.jdbc.FBDriver
+JDBC_URL=jdbc:firebirdsql:localhost/3050:employee
+#JDBC_URL=jdbc:firebirdsql:localhost/3050:/Library/Frameworks/Firebird.framework/Resources/examples/empbuild/employee.fdb
+JDBC_USER=sysdba
+JDBC_PASSWORD=masterkey
