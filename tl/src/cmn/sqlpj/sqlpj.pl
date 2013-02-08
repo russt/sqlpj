@@ -22,7 +22,7 @@
 
 #
 # @(#)sqlpj.pl
-# Copyright 2007-2010 Russ Tremain. All Rights Reserved.
+# Copyright 2007-2013 Russ Tremain. All Rights Reserved.
 #
 # END_HEADER - DO NOT EDIT
 #
@@ -987,7 +987,7 @@ sub parseJdbcPropertiesFile
         #skip comments:
         next if ($prop =~ /^\s*[#\*]/);
 
-        my (@line) = split(/\s*=\s*/, $prop, -1);    #-1 => include trailing null field
+        my (@line) = split(/\s*=\s*/, $prop, 2);    #values (db url) can have "=" in them!  RT 8/30/12
         if ($#line < 1) {
             printf STDERR "%s[%s]:  WARNING: bad record, '%s' in property file, '%s'\n",
                 $self->getProgName(), $pkgname, $prop, $self->getJdbcPropsFileName();
@@ -1267,8 +1267,10 @@ sub new
         'mMetaFuncs'    => undef,
         'mDatabaseName' => undef,
         'mDatabaseProductName' => undef,
-        'mIsOracle' => undef,
-        'mIsMysql' => undef,
+        'mIsOracle' => 0,
+        'mIsMysql' => 0,
+        'mIsDerby' => 0,
+        'mIsFirebird' => 0,
         'mSqlTables'    => undef,      #handle to tables object for this connection
         'mXmlDisplay'   => 0,          #if true, display result-sets as sql/xml
         'mCsvDisplay'   => 0,          #if true, display result-sets as comma-separated-data
@@ -1483,7 +1485,14 @@ sub sqlsession
 
     while ($lbuf = <$aFh>)
     {
-        #local commands:
+        #discard comments:
+        #TODO:  handle /* */ C-style comments.
+        if ($lbuf =~ /^[ \t\f]*--/) {
+            #prevent comments from being "executed" by deleting any semi-colons at EOI:
+            $lbuf =~ s/;[;\s]*$//;
+        } 
+        
+        #local command?
         if ($self->localCommand($lbuf)) {
             print $self->prompt();
             $sqlbuf = "";    #clear the buffer:
@@ -1559,6 +1568,8 @@ sub sql_exec
         if (&Inline::Java::caught("java.sql.SQLException")){
             my $msg = $@->getMessage() ;
             printf STDERR "%s[sql_exec]:  Java exception: execute: '%s'\n", $pkgname, $msg;
+            #dump the buffer:
+            printf STDERR "Buffer Contents:\n%s\n", $sqlbuf;
         } else {
             printf STDERR "%s[sql_exec]:  ERROR on execute: '%s'\n",$pkgname, $@;
         }
@@ -1724,6 +1735,9 @@ sub sql_init_connection
     #make sure currentl connection is closed:
     $self->sql_close_connection();
 
+    printf STDERR "jdbcDriver='%s getJdbcUrl='%s' user='%s' password='%s'\n",
+        $self->jdbcDriver(), $self->getJdbcUrl(), $self->user(), $self->password() if ($DEBUG);
+
     #try to get a connection:
     eval {
         $self->setConnection(JDBC->getConnection($self->getJdbcUrl(), $self->user(), $self->password()));
@@ -1737,16 +1751,19 @@ sub sql_init_connection
 
         if ($self->getDatabaseProductName() =~ /MySQL/i ) {
             $self->setIsMysql(1);
-            $self->setIsOracle(0);
 
             #set database name from connection url:  relies on $self->getDatabaseProductName()):
             $self->setDatabaseName( &getDbnameFromUrl($self->getJdbcUrl()) );
         } elsif ($self->getDatabaseProductName() =~ /Oracle/i ) {
-            $self->setIsMysql(0);
             $self->setIsOracle(1);
 
             #the database name is really the "schema" name in oracle.
             $self->setDatabaseName( $self->user() );
+        } elsif ($self->getDatabaseProductName() =~ /Firebird/i ) {
+            $self->setIsFirebird(1);
+            #$self->setDatabaseName( &getDbnameFromUrl($self->getJdbcUrl()) );
+        } elsif ($self->getDatabaseProductName() =~ /Derby/i ) {
+            $self->setIsDerby(1);
         }
 
         $self->setDatabaseProductName( $self->getMetaData()->getDatabaseProductName() );
@@ -1762,7 +1779,7 @@ sub sql_init_connection
         return 0;
     }
 
-    printf "isOracle=%d isMySql=%d\n", $self->getIsOracle(), $self->getIsMysql() if ($DEBUG);
+    printf "isOracle=%d isMySql=%d isDerby=%d isFirebird=%d\n", $self->getIsOracle(), $self->getIsMysql(), $self->getIsDerby(), $self->getIsFirebird() if ($DEBUG);
 
     #init or re-init our tables object:
     $self->setSqlTables( new sqltables($self->getMetaData(), $self->getDatabaseName()) );
@@ -2197,22 +2214,32 @@ sub showTablesCommand
     }
 
     my $rseta = undef;
+    my $rsetb = undef;
+    my $rsetc = undef;
 
     my @excludenames = (
         "TABLE_CAT",
         "TABLE_SCHEM",
 #       "TABLE_NAME",  #keep
-        "TABLE_TYPE",
+#       "TABLE_TYPE",  #keep
         "REMARKS",
     );
 
-#getTables(String catalog, String schemaPattern, String tableNamePattern, String types[])'  => 'ResultSet',
-#getSuperTables(String catalog, String schemaPattern, String tableNamePattern)'  => 'ResultSet',
+#getTables(String catalog, String schemaPattern, String tableNamePattern, String types[])  => ResultSet,
+#getSuperTables(String catalog, String schemaPattern, String tableNamePattern)  => ResultSet,
+#getSuperTypes(String catalog, String schemaPattern, String typeNamePattern)  => ResultSet,
+
+#ResultSet tables = metaData.getTables( null, null, "customer", new String[]{"TABLE"});
 
     #show the tables from the named database:
     eval {
-        $rseta = $dbMetaData->getTables($dbname, "%", "%", []);
-        #$rsetb = $dbMetaData->getSuperTables($dbname, "%", "%");
+        my @list = ("TABLE","SYSTEM TABLE","VIEW");
+        @list = ("TABLE");
+        $rseta = $dbMetaData->getTables(undef, undef, "%", [@list]);
+        #$rseta = $dbMetaData->getTables(undef, undef, "%", ["TABLE","SYSTEM TABLE","VIEW"]);
+        #$rseta = $dbMetaData->getTables(undef, undef, "%", ["TABLE"]);
+        #$rseta = $dbMetaData->getTables($dbname, "%", "%", []);
+        $rsetb = $dbMetaData->getSuperTables(undef, "%", "%");
         #$rsetc = $dbMetaData->getSuperTypes($dbname, "%", "%");
     };
 
@@ -2227,6 +2254,7 @@ sub showTablesCommand
     }
 
     $self->displayResultSet($rseta, &columnExcludeMap($rseta, @excludenames));
+    $self->displayResultSet($rsetb, &columnExcludeMap($rsetb, @excludenames));
     return 1;
 }
 
@@ -2495,6 +2523,36 @@ sub setIsMysql
     my ($self, $value) = @_;
     $self->{'mIsMysql'} = $value;
     return $self->{'mIsMysql'};
+}
+
+sub getIsDerby
+#return value of IsDerby
+{
+    my ($self) = @_;
+    return $self->{'mIsDerby'};
+}
+
+sub setIsDerby
+#set value of IsDerby and return value.
+{
+    my ($self, $value) = @_;
+    $self->{'mIsDerby'} = $value;
+    return $self->{'mIsDerby'};
+}
+
+sub getIsFirebird
+#return value of IsFirebird
+{
+    my ($self) = @_;
+    return $self->{'mIsFirebird'};
+}
+
+sub setIsFirebird
+#set value of IsFirebird and return value.
+{
+    my ($self, $value) = @_;
+    $self->{'mIsFirebird'} = $value;
+    return $self->{'mIsFirebird'};
 }
 
 sub getSqlTables
@@ -2898,7 +2956,7 @@ sub main
     #initialize our driver class:
     if (!$psqlImpl->check_driver()) {
         printf STDERR "%s:  ERROR: JDBC driver '%s' is not available for url '%s', user '%s', password '%s'\n",
-            $pkgname, $psqlImpl->jdbcDriver(), $psqlImpl->jdbcUrl(), $psqlImpl->user(), $psqlImpl->password();
+            $pkgname, $psqlImpl->jdbcDriver(), $psqlImpl->getJdbcUrl(), $psqlImpl->user(), $psqlImpl->password();
         return 1;
     }
 

@@ -50,6 +50,8 @@ PL_OBJ_ATTRIBUTES := << EOF
 'mDatabaseProductName' => undef,
 'mIsOracle' => 0,
 'mIsMysql' => 0,
+'mIsDerby' => 0,
+'mIsFirebird' => 0,
 'mSqlTables'    => undef,      #handle to tables object for this connection
 'mXmlDisplay'   => 0,          #if true, display result-sets as sql/xml
 'mCsvDisplay'   => 0,          #if true, display result-sets as comma-separated-data
@@ -92,6 +94,10 @@ PL_ATTRIBUTE_NAME = DatabaseProductName
 PL_ATTRIBUTE_NAME = IsOracle
 %evalmacro >> getset_methods pl_getset
 PL_ATTRIBUTE_NAME = IsMysql
+%evalmacro >> getset_methods pl_getset
+PL_ATTRIBUTE_NAME = IsDerby
+%evalmacro >> getset_methods pl_getset
+PL_ATTRIBUTE_NAME = IsFirebird
 %evalmacro >> getset_methods pl_getset
 PL_ATTRIBUTE_NAME = SqlTables
 %evalmacro >> getset_methods pl_getset
@@ -148,7 +154,14 @@ sub sqlsession
 
     while ($lbuf = <$aFh>)
     {
-        #local commands:
+        #discard comments:
+        #TODO:  handle /* */ C-style comments.
+        if ($lbuf =~ /^[ \t\f]*--/) {
+            #prevent comments from being "executed" by deleting any semi-colons at EOI:
+            $lbuf =~ s/;[;\s]*$//;
+        } 
+        
+        #local command?
         if ($self->localCommand($lbuf)) {
             print $self->prompt();
             $sqlbuf = "";    #clear the buffer:
@@ -224,6 +237,8 @@ sub sql_exec
         if (&Inline::Java::caught("java.sql.SQLException")){
             my $msg = $@->getMessage() ;
             printf STDERR "%s[sql_exec]:  Java exception: execute: '%s'\n", $pkgname, $msg;
+            #dump the buffer:
+            printf STDERR "Buffer Contents:\n%s\n", $sqlbuf;
         } else {
             printf STDERR "%s[sql_exec]:  ERROR on execute: '%s'\n",$pkgname, $@;
         }
@@ -389,7 +404,8 @@ sub sql_init_connection
     #make sure currentl connection is closed:
     $self->sql_close_connection();
 
-printf STDERR "jdbcDriver='%s getJdbcUrl='%s' user='%s' password='%s'\n", $self->jdbcDriver(), $self->getJdbcUrl(), $self->user(), $self->password();
+    printf STDERR "jdbcDriver='%s getJdbcUrl='%s' user='%s' password='%s'\n",
+        $self->jdbcDriver(), $self->getJdbcUrl(), $self->user(), $self->password() if ($DEBUG);
 
     #try to get a connection:
     eval {
@@ -404,16 +420,19 @@ printf STDERR "jdbcDriver='%s getJdbcUrl='%s' user='%s' password='%s'\n", $self-
 
         if ($self->getDatabaseProductName() =~ /MySQL/i ) {
             $self->setIsMysql(1);
-            $self->setIsOracle(0);
 
             #set database name from connection url:  relies on $self->getDatabaseProductName()):
             $self->setDatabaseName( &getDbnameFromUrl($self->getJdbcUrl()) );
         } elsif ($self->getDatabaseProductName() =~ /Oracle/i ) {
-            $self->setIsMysql(0);
             $self->setIsOracle(1);
 
             #the database name is really the "schema" name in oracle.
             $self->setDatabaseName( $self->user() );
+        } elsif ($self->getDatabaseProductName() =~ /Firebird/i ) {
+            $self->setIsFirebird(1);
+            #$self->setDatabaseName( &getDbnameFromUrl($self->getJdbcUrl()) );
+        } elsif ($self->getDatabaseProductName() =~ /Derby/i ) {
+            $self->setIsDerby(1);
         }
 
         $self->setDatabaseProductName( $self->getMetaData()->getDatabaseProductName() );
@@ -429,7 +448,7 @@ printf STDERR "jdbcDriver='%s getJdbcUrl='%s' user='%s' password='%s'\n", $self-
         return 0;
     }
 
-    printf "isOracle=%d isMySql=%d\n", $self->getIsOracle(), $self->getIsMysql() if ($DEBUG);
+    printf "isOracle=%d isMySql=%d isDerby=%d isFirebird=%d\n", $self->getIsOracle(), $self->getIsMysql(), $self->getIsDerby(), $self->getIsFirebird() if ($DEBUG);
 
     #init or re-init our tables object:
     $self->setSqlTables( new {=SQLTABLES_PACKAGE=}($self->getMetaData(), $self->getDatabaseName()) );
@@ -864,22 +883,32 @@ sub showTablesCommand
     }
 
     my $rseta = undef;
+    my $rsetb = undef;
+    my $rsetc = undef;
 
     my @excludenames = (
         "TABLE_CAT",
         "TABLE_SCHEM",
 #       "TABLE_NAME",  #keep
-        "TABLE_TYPE",
+#       "TABLE_TYPE",  #keep
         "REMARKS",
     );
 
-#getTables(String catalog, String schemaPattern, String tableNamePattern, String types[])'  => 'ResultSet',
-#getSuperTables(String catalog, String schemaPattern, String tableNamePattern)'  => 'ResultSet',
+#getTables(String catalog, String schemaPattern, String tableNamePattern, String types[])  => ResultSet,
+#getSuperTables(String catalog, String schemaPattern, String tableNamePattern)  => ResultSet,
+#getSuperTypes(String catalog, String schemaPattern, String typeNamePattern)  => ResultSet,
+
+#ResultSet tables = metaData.getTables( null, null, "customer", new String[]{"TABLE"});
 
     #show the tables from the named database:
     eval {
-        $rseta = $dbMetaData->getTables($dbname, "%", "%", []);
-        #$rsetb = $dbMetaData->getSuperTables($dbname, "%", "%");
+        my @list = ("TABLE","SYSTEM TABLE","VIEW");
+        @list = ("TABLE");
+        $rseta = $dbMetaData->getTables(undef, undef, "%", [@list]);
+        #$rseta = $dbMetaData->getTables(undef, undef, "%", ["TABLE","SYSTEM TABLE","VIEW"]);
+        #$rseta = $dbMetaData->getTables(undef, undef, "%", ["TABLE"]);
+        #$rseta = $dbMetaData->getTables($dbname, "%", "%", []);
+        $rsetb = $dbMetaData->getSuperTables(undef, "%", "%");
         #$rsetc = $dbMetaData->getSuperTypes($dbname, "%", "%");
     };
 
@@ -894,6 +923,7 @@ sub showTablesCommand
     }
 
     $self->displayResultSet($rseta, &columnExcludeMap($rseta, @excludenames));
+    $self->displayResultSet($rsetb, &columnExcludeMap($rsetb, @excludenames));
     return 1;
 }
 

@@ -15,9 +15,9 @@ echo MKDIR STATUS is $?
 
 echo Creating $REGRESS_TESTDB_PROPS
 cat > "$REGRESS_TESTDB_PROPS" << EOF
-JDBC_CLASSPATH=$REGRESS_SRCROOT/drivers/db-derby-10.9.1.0-lib/lib/derby.jar
+JDBC_CLASSPATH=$REGRESS_SRCROOT/drivers/derby.jar
 JDBC_DRIVER_CLASS=org.apache.derby.jdbc.EmbeddedDriver
-JDBC_URL=jdbc:derby:derbydb;create=true
+JDBC_URL=jdbc:derby:testDB;create=true
 JDBC_USER=test
 JDBC_PASSWORD=test
 EOF

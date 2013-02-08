@@ -21,7 +21,7 @@
 %include build_setup.defs
 %include cgsrc/psql.cg
 
-COPYRIGHT_YEARS  = 2007-2010
+COPYRIGHT_YEARS  = 2007-2013
 COPYRIGHT_HOLDER = Russ Tremain
 %export COPYRIGHT_YEARS
 %export COPYRIGHT_HOLDER

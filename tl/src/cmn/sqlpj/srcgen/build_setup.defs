@@ -1,6 +1,8 @@
 #return if already included:
 %ifdef BUILD_SETUP_COMPLETE %return
 
+%pragma trim_multiline_rnewline 1
+
 #defaults if not defined by caller:
 %ifndef CG_ROOT           CG_ROOT = ./bld
 

@@ -798,7 +798,7 @@ SHARED_JVM
        Starting with version 0.30, the "Inline::Java" JVM can now be shared
        between multiple processes. The first process to start creates the JVM
        but does not shut it down on exit. All other processes can then connect
-       as needed to the JVM.  If any of these other processes where created by
+       as needed to the JVM.  If any of these other processes were created by
        forking the parent process, the Inline::Java->reconnect_JVM() function
        must be called in the child to get a fresh connection to the JVM. Ex:
 

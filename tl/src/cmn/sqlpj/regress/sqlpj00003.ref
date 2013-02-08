@@ -1,2 +1,50 @@
 TESTNAME is sqlpj00003
-sqlpj status is 0
+Usage:  sqlpj [options] [file ...]
+
+SYNOPSIS
+  Creates a new database connection and runs each
+  sql file provided on the command line.  If no files
+  are given, then prompts for sql statements on stdin.
+
+  Sql statements will be executed when the input contains
+  a ';' command delimiter.  The delimiter must
+  appear at the end of the line or alone on a line.
+
+OPTIONS
+  -help             Display this help message.
+  -V                Show the sqlpj version.
+  -verbose          Display additional informational messages.
+  -debug            Display debug messages.
+  -ddebug           Display deep debug messages.
+  -quiet            Display severe errors only.
+
+  -props file       A java property file containing the JDBC connection parameters:
+                    The following property keys are recognized:
+
+                        JDBC_CLASSPATH, JDBC_DRIVER_CLASS,
+                        JDBC_URL, JDBC_USER, JDBC_PASSWORD
+
+  -classpath string Classpath containing the JDBC driver (can be a single jar).
+  -driver classname Name of the driver class
+  -url name         Jdbc connection url
+  -user name        Username used for connection
+  -password string  Password for this user
+  -prompt string    Use <string> as prompt instead of default.
+
+ENVIRONMENT
+ CLASSPATH      Java CLASSPATH, inherited by JDBC.pm
+
+EXAMPLES
+  sqlpj -url jdbc:mysql://localhost:3306/mysql -user root -password secret -classpath mysqljdbc.jar -driver com.mysql.jdbc.Driver
+
+  Similar example, with connection properties in "localmysql.props",
+  and reading commands from "myscript.sql":
+
+  % cat localmysql.props
+JDBC_CLASSPATH=mysqljdbc.jar
+JDBC_DRIVER_CLASS=com.mysql.jdbc.Driver
+JDBC_URL=jdbc:mysql://localhost:3306/mysql
+JDBC_USER=root
+JDBC_PASSWORD=secret
+
+  sqlpj -props localmysql.props -prompt "" myscript.sql

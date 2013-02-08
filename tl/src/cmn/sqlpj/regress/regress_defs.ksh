@@ -6,10 +6,15 @@ unset PS; PS=':' ; _doscnt=`echo $PATH | grep -c ';'` ; [ $_doscnt -ne 0 ] && PS
 #this is the install root for sqlpj:
 SQLPJ_SRCROOT="$SRCROOT/tl/src/cmn/sqlpj"
 REGRESS_SRCROOT="$SQLPJ_SRCROOT/regress"
-SQLPJ_CGROOT="$SQLPJ_SRCROOT/srcgen/cgsrc/bld"
-
 #this is where we write test output:
-TEST_ROOT=../bld/tst
+TEST_ROOT=$SQLPJ_SRCROOT/bld/tst
+
+SQLPJ_CGROOT="$SQLPJ_SRCROOT/srcgen/bld"
+if [ ! -d $SQLPJ_SRCROOT ]; then
+    2>&1 echo WARNING:  you must generate sqlpj in $SQLPJ_CGROOT to test latest source
+    #fall back to latest installed version:
+    SQLPJ_CGROOT="$SQLPJ_SRCROOT"
+fi
 
 #this database will be created as part of test suite:
 REGRESS_TESTDB=sqltestdb

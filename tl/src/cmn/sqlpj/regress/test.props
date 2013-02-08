@@ -1,0 +1,7 @@
+#setenv CLASSPATH "${DERBY_HOME}/lib/derby.jar:${DERBY_HOME}/lib/derbytools.jar"
+#JDBC_CLASSPATH=/Users/russt/proj/rttl/devtools/tl/src/cmn/sqlpj/regress/drivers/db-derby-10.9.1.0-bin/lib/derby.jar:/Users/russt/proj/rttl/devtools/tl/src/cmn/sqlpj/regress/drivers/db-derby-10.9.1.0-bin/lib/derbytools.jar
+JDBC_CLASSPATH=/Users/russt/proj/rttl/devtools/tl/src/cmn/sqlpj/regress/drivers/derby.jar
+JDBC_DRIVER_CLASS=org.apache.derby.jdbc.EmbeddedDriver
+JDBC_URL=jdbc:derby:../bld/tst/testDB;create=true
+JDBC_USER=test
+JDBC_PASSWORD=test
