@@ -1,0 +1,17 @@
+TESTNAME is sqlpj00007
++----------------------------------------------------------------------------------------------------+
+|TABLE_NAME        |TABLE_TYPE|TYPE_CAT|TYPE_SCHEM|TYPE_NAME|SELF_REFERENCING_COL_NAME|REF_GENERATION|
++----------------------------------------------------------------------------------------------------+
+|AIRLINES          |TABLE     |(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
+|CITIES            |TABLE     |(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
+|COUNTRIES         |TABLE     |(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
+|FLIGHTAVAILABILITY|TABLE     |(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
+|FLIGHTS           |TABLE     |(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
+|FLIGHTS_HISTORY   |TABLE     |(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
+|MAPS              |TABLE     |(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
++----------------------------------------------------------------------------------------------------+
++--------------------------+
+|TABLE_NAME|SUPERTABLE_NAME|
++--------------------------+
++--------------------------+
+sqlpj status is 0
