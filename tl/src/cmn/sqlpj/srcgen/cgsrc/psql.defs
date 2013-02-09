@@ -103,6 +103,9 @@ $SIG{'TRAP'} = '{=PL_PACKAGE=}::rec_signal';
 #######
 $psqlImpl = new {=PSQLIMPL_PACKAGE=}($scfg);
 
+#reset the prompt string if user supplied the option:
+$psqlImpl->setPrompt($psqlImpl->userSuppliedPrompt()) if (defined($psqlImpl->userSuppliedPrompt()));
+
 #initialize our driver class:
 if (!$psqlImpl->check_driver()) {
     printf STDERR "%s:  ERROR: JDBC driver '%s' is not available for url '%s', user '%s', password '%s'\n",
@@ -213,7 +216,6 @@ sub rec_signal
 PL_PARSE_ARGS_PRE := << EOF
 #set defaults:
 $scfg->setProgName($p);
-$scfg->setPrompt("sqlpj> ");
 $scfg->setPathSeparator($Config{path_sep});
 EOF
 %evalmacro PL_PARSE_ARGS_PRE PL_PARSE_ARGS_PRE
@@ -289,11 +291,11 @@ PL_PARSE_ARGS_LOOP := << EOF
     }
 } elsif ($flag =~ '^-noprompt') {
     # clear prompt, same as "-prompt ''"
-    $scfg->setPrompt('');
+    $scfg->setUserSuppliedPrompt('');
 } elsif ($flag =~ '^-prompt') {
     # -prompt string    Use <string> as prompt instead of default.
     if ($#ARGV+1 > 0 && $ARGV[0] !~ /^-/) {
-        $scfg->setPrompt(shift(@ARGV));
+        $scfg->setUserSuppliedPrompt(shift(@ARGV));
     } else {
         printf STDERR "%s:  -prompt requires the prompt string.\n", $p;
         return 1;

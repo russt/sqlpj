@@ -42,7 +42,8 @@ PL_OBJ_ATTRIBUTES := << EOF
 'mJdbcUrl'     => $cfg->getJdbcUrl(),
 'mUser'        => $cfg->getJdbcUser(),
 'mPassword'    => $cfg->getJdbcPassword(),
-'mPrompt'      => $cfg->getPrompt(),
+'mPrompt'      => "{=SQLPJ_PACKAGE=}> ",
+'mUserSuppliedPrompt' => $cfg->getUserSuppliedPrompt(),
 'mExecCommandString' => $cfg->getExecCommandString(),
 'mConnection'  => undef,
 'mMetaData'    => undef,
@@ -59,7 +60,7 @@ PL_OBJ_ATTRIBUTES := << EOF
 'mHeaderSetting' => 1,         #if true, display table headers with data (default is on)
 'mPathSeparator' => $cfg->getPathSeparator(),
 EOF
-#%evalmacro PL_OBJ_ATTRIBUTES PL_OBJ_ATTRIBUTES
+%evalmacro PL_OBJ_ATTRIBUTES PL_OBJ_ATTRIBUTES
 
 #this is for further initialzation of attributes, since hash init cannot be self-referential:
 PL_POST_ATTRIBUTE_INIT := << EOF
@@ -110,8 +111,12 @@ PL_ATTRIBUTE_NAME = HeaderSetting
 %evalmacro >> getset_methods pl_getset
 PL_ATTRIBUTE_NAME = ExecCommandString
 %evalmacro >> getset_methods pl_getset
+PL_ATTRIBUTE_NAME = Prompt
+%evalmacro >> getset_methods pl_getset
 
-#generate read-only attributes:
+##########
+#read-only attributes:
+##########
 PL_ATTRIBUTE_NAME = JdbcClassPath
 %evalmacro >> getset_methods pl_attr_method
 PL_ATTRIBUTE_NAME = JdbcDriver
@@ -122,7 +127,7 @@ PL_ATTRIBUTE_NAME = Password
 %evalmacro >> getset_methods pl_attr_method
 PL_ATTRIBUTE_NAME = PathSeparator
 %evalmacro >> getset_methods pl_attr_method
-PL_ATTRIBUTE_NAME = Prompt
+PL_ATTRIBUTE_NAME = UserSuppliedPrompt
 %evalmacro >> getset_methods pl_attr_method
 PL_ATTRIBUTE_NAME = MetaFuncs
 %evalmacro >> getset_methods pl_attr_method
@@ -153,7 +158,7 @@ sub sqlsession
     my $sqlbuf = "";
     my $lbuf = "";
 
-    print $self->prompt();
+    print $self->getPrompt();
 
     while ($lbuf = <$aFh>)
     {
@@ -166,7 +171,7 @@ sub sqlsession
         
         #local command?
         if ($self->localCommand($lbuf)) {
-            print $self->prompt();
+            print $self->getPrompt();
             $sqlbuf = "";    #clear the buffer:
             next;
         }
@@ -190,7 +195,7 @@ sub sqlsession
             $sqlbuf = "";
         }
 
-        print $self->prompt();
+        print $self->getPrompt();
     }
 
     $self->sql_close_connection();
@@ -442,19 +447,23 @@ sub sql_init_connection
 
         if ($self->getDatabaseProductName() =~ /MySQL/i ) {
             $self->setIsMysql(1);
+            $self->setPrompt("mysql> ") unless (defined($self->userSuppliedPrompt()));
 
             #set database name from connection url:  relies on $self->getDatabaseProductName()):
             $self->setDatabaseName( &getDbnameFromUrl($self->getJdbcUrl()) );
         } elsif ($self->getDatabaseProductName() =~ /Oracle/i ) {
             $self->setIsOracle(1);
+            $self->setPrompt("oracle> ") unless (defined($self->userSuppliedPrompt()));
 
             #the database name is really the "schema" name in oracle.
             $self->setDatabaseName( $self->user() );
         } elsif ($self->getDatabaseProductName() =~ /Firebird/i ) {
             $self->setIsFirebird(1);
+            $self->setPrompt("firebird> ") unless (defined($self->userSuppliedPrompt()));
             #$self->setDatabaseName( &getDbnameFromUrl($self->getJdbcUrl()) );
         } elsif ($self->getDatabaseProductName() =~ /Derby/i ) {
             $self->setIsDerby(1);
+            $self->setPrompt("derbydb> ") unless (defined($self->userSuppliedPrompt()));
         }
 
         $self->setDatabaseProductName( $self->getMetaData()->getDatabaseProductName() );

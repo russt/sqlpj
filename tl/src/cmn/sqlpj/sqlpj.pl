@@ -919,7 +919,7 @@ sub new
     #set up class attribute  hash and bless it into class:
     my $self = bless {
         'mProgName' => undef,
-        'mPrompt' => undef,
+        'mUserSuppliedPrompt' => undef,
         'mJdbcClassPath' => undef,
         'mJdbcDriverClass' => undef,
         'mJdbcUrl' => undef,
@@ -1138,19 +1138,19 @@ sub setPathSeparator
     return $self->{'mPathSeparator'};
 }
 
-sub getPrompt
-#return value of Prompt
+sub getUserSuppliedPrompt
+#return value of UserSuppliedPrompt
 {
     my ($self) = @_;
-    return $self->{'mPrompt'};
+    return $self->{'mUserSuppliedPrompt'};
 }
 
-sub setPrompt
-#set value of Prompt and return value.
+sub setUserSuppliedPrompt
+#set value of UserSuppliedPrompt and return value.
 {
     my ($self, $value) = @_;
-    $self->{'mPrompt'} = $value;
-    return $self->{'mPrompt'};
+    $self->{'mUserSuppliedPrompt'} = $value;
+    return $self->{'mUserSuppliedPrompt'};
 }
 
 sub getDebug
@@ -1277,7 +1277,8 @@ sub new
         'mJdbcUrl'     => $cfg->getJdbcUrl(),
         'mUser'        => $cfg->getJdbcUser(),
         'mPassword'    => $cfg->getJdbcPassword(),
-        'mPrompt'      => $cfg->getPrompt(),
+        'mPrompt'      => "sqlpj> ",
+        'mUserSuppliedPrompt' => $cfg->getUserSuppliedPrompt(),
         'mExecCommandString' => $cfg->getExecCommandString(),
         'mConnection'  => undef,
         'mMetaData'    => undef,
@@ -1498,7 +1499,7 @@ sub sqlsession
     my $sqlbuf = "";
     my $lbuf = "";
 
-    print $self->prompt();
+    print $self->getPrompt();
 
     while ($lbuf = <$aFh>)
     {
@@ -1511,7 +1512,7 @@ sub sqlsession
         
         #local command?
         if ($self->localCommand($lbuf)) {
-            print $self->prompt();
+            print $self->getPrompt();
             $sqlbuf = "";    #clear the buffer:
             next;
         }
@@ -1535,7 +1536,7 @@ sub sqlsession
             $sqlbuf = "";
         }
 
-        print $self->prompt();
+        print $self->getPrompt();
     }
 
     $self->sql_close_connection();
@@ -1787,19 +1788,23 @@ sub sql_init_connection
 
         if ($self->getDatabaseProductName() =~ /MySQL/i ) {
             $self->setIsMysql(1);
+            $self->setPrompt("mysql> ") unless (defined($self->userSuppliedPrompt()));
 
             #set database name from connection url:  relies on $self->getDatabaseProductName()):
             $self->setDatabaseName( &getDbnameFromUrl($self->getJdbcUrl()) );
         } elsif ($self->getDatabaseProductName() =~ /Oracle/i ) {
             $self->setIsOracle(1);
+            $self->setPrompt("oracle> ") unless (defined($self->userSuppliedPrompt()));
 
             #the database name is really the "schema" name in oracle.
             $self->setDatabaseName( $self->user() );
         } elsif ($self->getDatabaseProductName() =~ /Firebird/i ) {
             $self->setIsFirebird(1);
+            $self->setPrompt("firebird> ") unless (defined($self->userSuppliedPrompt()));
             #$self->setDatabaseName( &getDbnameFromUrl($self->getJdbcUrl()) );
         } elsif ($self->getDatabaseProductName() =~ /Derby/i ) {
             $self->setIsDerby(1);
+            $self->setPrompt("derbydb> ") unless (defined($self->userSuppliedPrompt()));
         }
 
         $self->setDatabaseProductName( $self->getMetaData()->getDatabaseProductName() );
@@ -2708,6 +2713,21 @@ sub setExecCommandString
     return $self->{'mExecCommandString'};
 }
 
+sub getPrompt
+#return value of Prompt
+{
+    my ($self) = @_;
+    return $self->{'mPrompt'};
+}
+
+sub setPrompt
+#set value of Prompt and return value.
+{
+    my ($self, $value) = @_;
+    $self->{'mPrompt'} = $value;
+    return $self->{'mPrompt'};
+}
+
 sub jdbcClassPath
 #return value of mJdbcClassPath
 {
@@ -2743,11 +2763,11 @@ sub pathSeparator
     return $self->{'mPathSeparator'};
 }
 
-sub prompt
-#return value of mPrompt
+sub userSuppliedPrompt
+#return value of mUserSuppliedPrompt
 {
     my ($self) = @_;
-    return $self->{'mPrompt'};
+    return $self->{'mUserSuppliedPrompt'};
 }
 
 sub metaFuncs
@@ -3104,6 +3124,9 @@ sub main
     #######
     $psqlImpl = new sqlpjImpl($scfg);
 
+    #reset the prompt string if user supplied the option:
+    $psqlImpl->setPrompt($psqlImpl->userSuppliedPrompt()) if (defined($psqlImpl->userSuppliedPrompt()));
+
     #initialize our driver class:
     if (!$psqlImpl->check_driver()) {
         printf STDERR "%s:  ERROR: JDBC driver '%s' is not available for url '%s', user '%s', password '%s'\n",
@@ -3278,7 +3301,6 @@ sub parse_args
 
     #set defaults:
     $scfg->setProgName($p);
-    $scfg->setPrompt("sqlpj> ");
     $scfg->setPathSeparator($Config{path_sep});
 
     #eat up flag args:
@@ -3356,11 +3378,11 @@ sub parse_args
             }
         } elsif ($flag =~ '^-noprompt') {
             # clear prompt, same as "-prompt ''"
-            $scfg->setPrompt('');
+            $scfg->setUserSuppliedPrompt('');
         } elsif ($flag =~ '^-prompt') {
             # -prompt string    Use <string> as prompt instead of default.
             if ($#ARGV+1 > 0 && $ARGV[0] !~ /^-/) {
-                $scfg->setPrompt(shift(@ARGV));
+                $scfg->setUserSuppliedPrompt(shift(@ARGV));
             } else {
                 printf STDERR "%s:  -prompt requires the prompt string.\n", $p;
                 return 1;

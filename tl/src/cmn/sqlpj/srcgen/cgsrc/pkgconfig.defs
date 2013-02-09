@@ -28,7 +28,7 @@ EOF
 
 PL_OBJ_ATTRIBUTES := << EOF
 'mProgName' => undef,
-'mPrompt' => undef,
+'mUserSuppliedPrompt' => undef,
 'mJdbcClassPath' => undef,
 'mJdbcDriverClass' => undef,
 'mJdbcUrl' => undef,
@@ -74,7 +74,7 @@ PL_ATTRIBUTE_NAME = JdbcPropsFileName
 %evalmacro >> getset_methods pl_getset
 PL_ATTRIBUTE_NAME = PathSeparator
 %evalmacro >> getset_methods pl_getset
-PL_ATTRIBUTE_NAME = Prompt
+PL_ATTRIBUTE_NAME = UserSuppliedPrompt
 %evalmacro >> getset_methods pl_getset
 PL_ATTRIBUTE_NAME = Debug
 %evalmacro >> getset_methods pl_getset
