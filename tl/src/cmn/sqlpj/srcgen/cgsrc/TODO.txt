@@ -1,4 +1,12 @@
-DISTRIBUTION:
+Some feature ideas, 2/8/13
+
+o for sql syntax errors, use the line/column numbers to generate a visual error message.
+                                                         like this ^
+o set prompt to be the database connection instead of "sqlpj>"
+  i.e.,  mysql>, derbydb>, ora>, firebird>, etc.
+
+-----------------
+DISTRIBUTION TODO:
 
 o add INSTALL instructions
 o package modules into one file (like I did for commitd)

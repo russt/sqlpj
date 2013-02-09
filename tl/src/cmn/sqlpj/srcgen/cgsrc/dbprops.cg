@@ -17,6 +17,15 @@ JDBC_USER={=JDBC_USER=}
 JDBC_PASSWORD={=JDBC_PASSWORD=}
 EOF
 
+JDBC_CLASSPATH=$SRCROOT/tl/src/cmn/sqlpj/regress/drivers/derby.jar
+JDBC_DRIVER_CLASS=org.apache.derby.jdbc.EmbeddedDriver
+JDBC_URL=jdbc:derby:testDB;create=true
+JDBC_USER=test
+JDBC_PASSWORD=test
+%evalmacro ECHO_TXT dbprop_template
+echo	/derbytestdb.props
+
+
 #######
 #oracle setups:
 #######
@@ -27,7 +36,7 @@ JDBC_URL =	$INF_CENTRAL_URL
 JDBC_USER =	$INF_CENTRAL_USER
 JDBC_PASSWORD =	$INF_CENTRAL_PASSWD
 %evalmacro ECHO_TXT dbprop_template
-echo	/infcentral.props
+#echo	/infcentral.props
 
 ######
 #mysql setups:
@@ -39,7 +48,7 @@ JDBC_URL =	$MOJAVE_BASE_URL/alaska_reports
 JDBC_USER =	$MOJAVE_INF_USER
 JDBC_PASSWORD =	$MOJAVE_INF_PASSWD
 %evalmacro ECHO_TXT dbprop_template
-echo	/mojaveak.props
+#echo	/mojaveak.props
 
 JDBC_URL =	$MOJAVE_BASE_URL/inf
 JDBC_USER =	$MOJAVE_INF_USER
@@ -63,10 +72,10 @@ JDBC_URL =	$OJCBUILDS_BASE_URL/alaska_reports
 JDBC_USER =	$OJCBUILDS_USER
 JDBC_PASSWORD =	$OJCBUILDS_PASSWD
 %evalmacro ECHO_TXT dbprop_template
-echo	/ojcak.props
+#echo	/ojcak.props
 
 JDBC_URL =	$OJCBUILDS_BASE_URL/mysql
 JDBC_USER =	root
 JDBC_PASSWORD =	cts123
 %evalmacro ECHO_TXT dbprop_template
-echo	/ojcmysql.props
+#echo	/ojcmysql.props

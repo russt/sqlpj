@@ -15,8 +15,11 @@ LOCAL_INCLUDES =          cgsrc
 LOCAL_INCLUDES =          $LOCAL_INCLUDES;..
 CG_TEMPLATE_PATH=         $LOCAL_INCLUDES;$CG_TEMPLATE_PATH
 
-TOOLROOT = $TOOLROOT:nameof:env
+SRCROOT =  $SRCROOT:nameof:env
+%ifndef SRCROOT %eecho ERROR: SRCROOT must be defined - ABORT
+%ifndef SRCROOT %halt 1
 
+TOOLROOT = $TOOLROOT:nameof:env
 %ifndef TOOLROOT %eecho ERROR: TOOLROOT must be defined - ABORT
 %ifndef TOOLROOT %halt 1
 
@@ -24,7 +27,6 @@ JDBC_CLASSLIB = $TOOLROOT/java/ant/lib
 
 %ifnot $JDBC_CLASSLIB:d  %eecho JDBC_CLASSLIB must be a directory - ABORT
 %ifnot $JDBC_CLASSLIB:d  %halt 2
-
 
 SQLPJ_PACKAGE      = sqlpj
 

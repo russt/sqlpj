@@ -34,7 +34,10 @@ OPTIONS
   -url name         Jdbc connection url
   -user name        Username used for connection
   -password string  Password for this user
+
+  -e string         Execute commands from "string" and exit.  Useful for timing commands.
   -prompt string    Use <string> as prompt instead of default.
+  -noprompt         Shorthand for -prompt ""
 
 ENVIRONMENT
  CLASSPATH      Java CLASSPATH, inherited by JDBC.pm
@@ -78,17 +81,27 @@ PL_PKG_ATTRIBUTES := << EOF
 my $USE_STDIN = 1;
 my @SQLFILES = ();
 my $scfg = new {=PKGCONFIG_PACKAGE=}();
+#this allows signal to close/open connection:
+my $psqlImpl = undef;
 EOF
 %evalmacro PL_PKG_ATTRIBUTES PL_PKG_ATTRIBUTES
 }
 
 {
-PL_MAIN := << EOF
+PL_MAIN := << //
+
+#we handle our own signals:
+$SIG{'INT'}  = '{=PL_PACKAGE=}::rec_signal';
+$SIG{'KILL'} = '{=PL_PACKAGE=}::rec_signal';
+$SIG{'QUIT'} = '{=PL_PACKAGE=}::rec_signal';
+$SIG{'TERM'} = '{=PL_PACKAGE=}::rec_signal';
+$SIG{'HUP'}  = '{=PL_PACKAGE=}::rec_signal';
+$SIG{'TRAP'} = '{=PL_PACKAGE=}::rec_signal';
 
 #######
 #create implementation class, passing in our configuration:
 #######
-my $psqlImpl = new {=PSQLIMPL_PACKAGE=}($scfg);
+$psqlImpl = new {=PSQLIMPL_PACKAGE=}($scfg);
 
 #initialize our driver class:
 if (!$psqlImpl->check_driver()) {
@@ -97,7 +110,16 @@ if (!$psqlImpl->check_driver()) {
     return 1;
 }
 
-if ($USE_STDIN) {
+if ( $psqlImpl->getExecCommandString() ) {
+    #...if we have an immediate command to execute, then do it and exit:
+    if (!$psqlImpl->sql_init_connection()) {
+        printf STDERR "%s:[sqlsession]:  cannot get a database connection:  ABORT\n", $pkgname;
+        return 1;
+    } else {
+       #return zero status if sql_exec is successful:
+       return !( $psqlImpl->sql_exec($psqlImpl->getExecCommandString()) );
+    }
+} elsif ($USE_STDIN) {
 #printf STDERR "%s:  using stdin\n", $pkgname;
     my $stdinh = "STDIN";
     $psqlImpl->sqlsession($stdinh, "<STDIN>");
@@ -112,12 +134,12 @@ if ($USE_STDIN) {
         }
     }
 }
-EOF
+//
 %evalmacro PL_MAIN PL_MAIN
 }
 
 { #subroutines
-PL_PKG_METHODS := << EOF
+PL_PKG_METHODS := << //
 sub checkSetClasspath
 #if we have a classpath setting, then add to the environemnt.
 #
@@ -159,7 +181,32 @@ sub checkJdbcSettings
     return($errs == 0);
 }
 
-EOF
+sub rec_signal
+# we only want to abort sqlexec in progress, not program.
+{
+    local($SIG) = @_;
+    my($prevHandler) = $SIG{$SIG};
+
+    # Reestablish the handler.
+    $SIG{$SIG} = $prevHandler;
+    printf STDERR ("\n%s:  Received SIG%s%s\n", $p, $SIG, ($SIG eq "HUP")? " - IGNORED" : "");
+
+#printf STDERR "psqlImpl=%s connection=%s\n", ref($psqlImpl), ref($psqlImpl->getConnection());
+
+    #reinitialize the connection if we got that far:
+    if ($psqlImpl->getConnection()) {
+        #none of this works...don't know how to recover the JVM or SQL connections.  RT 2/8/13
+        #Inline::Java->reconnect_JVM();
+        #JDBC->load_driver($psqlImpl->jdbcDriver());
+        #$psqlImpl->sql_init_connection() 
+    } else {
+        #if we have not initialized Inline::Java, then we can safetly continue.
+        return;
+    }
+
+    main::abort("Shutting down.\n");
+}
+//
 }
 
 {
@@ -198,6 +245,14 @@ PL_PARSE_ARGS_LOOP := << EOF
         printf STDERR "%s:  -password requires password string.\n", $p;
         return 1;
     }
+} elsif ($flag =~ '^-e') {
+    # -e string  Execute commands from "string" and exit.
+    if ($#ARGV+1 > 0 && $ARGV[0] !~ /^-/) {
+        $scfg->setExecCommandString(shift(@ARGV));
+    } else {
+        printf STDERR "%s:  -e requires string containing commands.\n", $p;
+        return 1;
+    }
 } elsif ($flag =~ '^-driver') {
     # -driver classname Name of the driver class
     if ($#ARGV+1 > 0 && $ARGV[0] !~ /^-/) {
@@ -232,6 +287,9 @@ PL_PARSE_ARGS_LOOP := << EOF
         printf STDERR "%s:  -url requires the JDBC connection url\n", $p;
         return 1;
     }
+} elsif ($flag =~ '^-noprompt') {
+    # clear prompt, same as "-prompt ''"
+    $scfg->setPrompt('');
 } elsif ($flag =~ '^-prompt') {
     # -prompt string    Use <string> as prompt instead of default.
     if ($#ARGV+1 > 0 && $ARGV[0] !~ /^-/) {

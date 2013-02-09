@@ -42,6 +42,7 @@ PL_OBJ_ATTRIBUTES := << EOF
 'mDDebug'        => 0,
 'mQuiet'         => 0,
 'mVerbose'       => 0,
+'mExecCommandString' => undef,
 EOF
 #%evalmacro PL_OBJ_ATTRIBUTES PL_OBJ_ATTRIBUTES
 
@@ -82,6 +83,8 @@ PL_ATTRIBUTE_NAME = DDebug
 PL_ATTRIBUTE_NAME = Verbose
 %evalmacro >> getset_methods pl_getset
 PL_ATTRIBUTE_NAME = Quiet
+%evalmacro >> getset_methods pl_getset
+PL_ATTRIBUTE_NAME = ExecCommandString
 %evalmacro >> getset_methods pl_getset
 
 #generate read-only attributes:
