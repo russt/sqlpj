@@ -1937,7 +1937,7 @@ Local commands are:
                         (can also use "describe <table>" in mysql & oracle).
                         (can also use "show columns from <table>" in mysql).
 
- show schema          - displays a consise schema of the database.
+ schema               - display a consise schema of the database (mysql only).
 
  show conn[ection]    - show jdbc connection properties, including product & version
  show create [table]  - generate sql to create all tables, or a single table.
