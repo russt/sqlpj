@@ -549,6 +549,9 @@ sub localCommand
     if ($buf =~ /^help/i) {
         $buf =~ s/help\s*//i;
         $handled = $self->helpCommand($buf);
+    } elsif ($buf  =~ /^echo/i) {
+        $buf =~ s/echo\s*//i;
+        $handled = $self->echoCommand($buf);
     } elsif ($buf  =~ /^set/i) {
         $buf =~ s/set\s*//i;
         $handled = $self->setCommand($buf);
@@ -580,6 +583,7 @@ sub helpCommand
     print <<"!";
 Local commands are:
  help                 - show this message.
+ echo [text]          - display <text>.  Useful for scripts to insert documentation.
 
  set csv [on]         - output tables as comma-separated data.
  set csv off          - turn off csv output display.
@@ -611,6 +615,16 @@ Local commands are:
 #                     - dump all or named table to stdout or <filename>
 
     return 1;    #we processed the help command.
+}
+
+sub echoCommand
+#return 1 if we handled the command, otherwise 0.
+{
+    my ($self, $text) = @_;
+
+    printf "%s\n", $text;
+
+    return 1;    #we processed the echo command.
 }
 
 sub showCommand
