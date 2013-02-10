@@ -374,11 +374,19 @@ sub displayResultSet
         print $divider;
     }
 
-    #display data:
-    while (defined($rowref =  shift(@allrows))) {
-        printf $fmt. "\n", @{$rowref};
+
+    {
+        # since we expect to have data with newlines in it, we turn off
+        # "Newline in left-justified string for printf ..." warnings for this block only:
+
+        no warnings 'printf';
+
+        #display data:
+        while (defined($rowref =  shift(@allrows))) {
+            printf $fmt. "\n", @{$rowref};
+        }
+        print $divider if ($self->getHeaderSetting());
     }
-    print $divider if ($self->getHeaderSetting());
 
     return 1;    #success
 }
