@@ -68,6 +68,13 @@ JDBC_PASSWORD =	$MOJAVE_INF_PASSWD
 %evalmacro ECHO_TXT dbprop_template
 echo	/mojavemysql.props
 
+#this the default local mysql database:
+JDBC_URL =	jdbc:mysql://localhost:3306/mysql
+JDBC_USER =	root
+JDBC_PASSWORD =
+%evalmacro ECHO_TXT dbprop_template
+echo	/mysql.props
+
 JDBC_URL =	$OJCBUILDS_BASE_URL/alaska_reports
 JDBC_USER =	$OJCBUILDS_USER
 JDBC_PASSWORD =	$OJCBUILDS_PASSWD

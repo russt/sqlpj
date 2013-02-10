@@ -119,8 +119,15 @@ if ( $psqlImpl->getExecCommandString() ) {
         printf STDERR "%s:[sqlsession]:  cannot get a database connection:  ABORT\n", $pkgname;
         return 1;
     } else {
-       #return zero status if sql_exec is successful:
-       return !( $psqlImpl->sql_exec($psqlImpl->getExecCommandString()) );
+
+        my $lbuf = $psqlImpl->getExecCommandString();
+
+        if ($psqlImpl->localCommand($lbuf)) {
+            #return zero status if execute is successful
+            return 0;
+        } else {
+            return !( $psqlImpl->sql_exec($lbuf) );
+        }
     }
 } elsif ($USE_STDIN) {
 #printf STDERR "%s:  using stdin\n", $pkgname;
@@ -133,7 +140,7 @@ if ( $psqlImpl->getExecCommandString() ) {
             $psqlImpl->sqlsession($infile, $SQLFILES[$ii]);
             close $infile;
         } else {
-            printf STDERR "%s:  ERROR: cannot open sql input, '%s':  '%s'\n", $pkgname, $SQLFILES[$ii], $!;
+            printf STDERR "%s:  ERROR: cannot open sql input file, '%s':  '%s'\n", $pkgname, $SQLFILES[$ii], $!;
         }
     }
 }

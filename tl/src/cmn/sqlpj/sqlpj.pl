@@ -1899,6 +1899,9 @@ sub localCommand
     } elsif ($buf  =~ /^show/i) {
         $buf =~ s/show\s*//i;
         $handled = $self->showCommand($buf);
+    } elsif ($buf  =~ /^schema/i) {
+        $buf =~ s/tables\s*//i;
+        $handled = $self->showSchemaCommand($buf);
     } elsif ($buf  =~ /^tables/i) {
         $buf =~ s/tables\s*//i;
         $handled = $self->showTablesCommand($buf);
@@ -1933,6 +1936,8 @@ Local commands are:
  table name [db]      - show information about table <name> in <db>, defaults to connection db.
                         (can also use "describe <table>" in mysql & oracle).
                         (can also use "show columns from <table>" in mysql).
+
+ show schema          - displays a consise schema of the database.
 
  show conn[ection]    - show jdbc connection properties, including product & version
  show create [table]  - generate sql to create all tables, or a single table.
@@ -2274,6 +2279,180 @@ sub showTableCommand
     $self->displayResultSet($rsetc, &columnExcludeMap($rsetc, @excludenamesc));
 
     return 1;
+}
+
+sub getTableAttributes
+#used by show schema command to get column name and type for a single table
+#return 1 if we handled the command, otherwise 0.
+{
+    my ($self, $dbname, $tblname) = @_;
+
+    my @excludenames = (
+        "TABLE_CAT",
+        "TABLE_SCHEM",
+        "TABLE_NAME",
+#       "COLUMN_NAME",
+        "DATA_TYPE",
+#       "TYPE_NAME",
+#       "COLUMN_SIZE",
+        "BUFFER_LENGTH",
+        "DECIMAL_DIGITS",
+        "NUM_PREC_RADIX",
+        "NULLABLE",
+        "REMARKS",
+        "COLUMN_DEF",
+        "SQL_DATA_TYPE",
+        "SQL_DATETIME_SUB",
+        "CHAR_OCTET_LENGTH",
+        "ORDINAL_POSITION",
+        "IS_NULLABLE",
+    );
+
+#printf STDERR "getTableAttributes: dbname='%s' tblname='%s'\n", $dbname, $tblname;
+
+    my $dbMetaData = $self->getMetaData();
+    my $rseta = undef;
+
+    eval {
+        #######
+        #column info
+        #######
+#'getColumns(String catalog, String schemaPattern, String tableNamePattern, String columnNamePattern)'  => 'ResultSet',
+        $rseta = $dbMetaData->getColumns($dbname, "%", $tblname, "%");
+    };
+
+    if ($@) {
+        if (Inline::Java::caught("java.lang.Exception")) {
+            my $xcptn = $@;
+            (my $xcptnName = $xcptn->toString()) =~ s/:.*//;
+
+            if ( isSqlException($xcptnName) ) {
+                printf STDERR "%s[showTableCommand]: '%s'\n", __PACKAGE__, $xcptn->getMessage();
+            } else {
+                printf STDERR "%s[showTableCommand]: ", __PACKAGE__;
+                $xcptn->printStackTrace();
+            }
+        } else {
+            #not a java exception:
+            printf STDERR "%s[showTableCommand]: eval FAILED:  %s\n", __PACKAGE__, $@;
+        }
+        return 1;  #we handled the command, even if we did get an exception
+    }
+
+    #foreach result set ...
+    my @allrows = ();
+    while ($rseta->next()) {
+        push @allrows, [getRow($rseta, 0, columnExcludeMap($rseta, @excludenames))] ;
+    }
+
+    my @tableColumnDescriptions = ();
+
+    for (@allrows) {
+        my ($name, $type, $size) = @{$_};
+
+        push @tableColumnDescriptions, sprintf("%s[%s%d]", $name, $type, $size);
+    }
+
+    return ($tblname, \@tableColumnDescriptions);
+}
+
+sub showSchemaCommand
+#implement the schema command, which displays a consise schema of the database.
+#return 1 if we handled the command, otherwise 0.
+{
+    my ($self, $dbname) = @_;
+
+    my $dbMetaData = $self->getMetaData();
+
+    if (!$self->getIsMysql()) {
+        printf STDERR "sorry, schema command is only implemented for mysql.\n";
+        return 1;
+    }
+
+    my $rseta = undef;
+    my $rsetb = undef;
+    my $rsetc = undef;
+
+    #this is passed to displayResultSet() and is probably different for every db.
+    my @excludenames = (
+#       "TABLE_CAT",   #keep
+        "TABLE_SCHEM",
+#       "TABLE_NAME",  #keep
+        "TABLE_TYPE",
+        "REMARKS",
+    );
+
+#getTables(String catalog, String schemaPattern, String tableNamePattern, String types[])  => ResultSet,
+#getSuperTables(String catalog, String schemaPattern, String tableNamePattern)  => ResultSet,
+#getSuperTypes(String catalog, String schemaPattern, String typeNamePattern)  => ResultSet,
+
+#ResultSet tables = metaData.getTables( null, null, "customer", new String[]{"TABLE"});
+
+    #show the tables from the named database:
+    eval {
+        $rseta = $dbMetaData->getTables(undef, undef, "%", undef);
+    };
+
+    if ($@) {
+        if (Inline::Java::caught("java.lang.Exception")) {
+            my $xcptn = $@;
+            (my $xcptnName = $xcptn->toString()) =~ s/:.*//;
+
+            if ( isSqlException($xcptnName) ) {
+                printf STDERR "%s[showTablesCommand]: '%s'\n", __PACKAGE__, $xcptn->getMessage();
+            } else {
+                printf STDERR "%s[showTablesCommand]: ", __PACKAGE__;
+                $xcptn->printStackTrace();
+            }
+        } else {
+            #not a java exception:
+            printf STDERR "%s[showTablesCommand]: eval FAILED:  %s\n", __PACKAGE__, $@;
+        }
+        return 1;  #we handled the command, even if we did get an exception
+    }
+
+    #foreach table, show attributes:
+    #$self->displayResultSet($rseta, &columnExcludeMap($rseta, @excludenames));
+    my @allrows = ();
+    while ($rseta->next()) {
+        push @allrows, [getRow($rseta, 0, columnExcludeMap($rseta, @excludenames))] ;
+    }
+
+    my @tables = ();
+    $dbname = undef;  #the name passed in is wrong
+
+    for (@allrows) {
+        my @theRow = @{$_};
+
+#printf STDERR "showSchemaCommand: theRow=(%s)\n", join('|', @theRow);
+
+        $dbname = $theRow[0] unless ($dbname);
+        push @tables, $theRow[1];
+    }
+
+    my @tablesWithAttributes = ();
+    for (@tables) {
+        push @tablesWithAttributes, [$self->getTableAttributes($dbname, $_)];
+    }
+
+    #now we can display the tables the way we want:
+    $self->displaySchemaTables($dbname, @tablesWithAttributes);
+
+    return 1;
+}
+
+sub displaySchemaTables
+{
+    my ($self, $dbname, @tablesWithAttributes) = @_;
+
+    printf "Concise Schema for database '%s'\n", $dbname;
+
+    for (@tablesWithAttributes) {
+        my ($tableName, $attrRef) = @{$_};
+        my @colAttributes = @{$attrRef};
+
+        printf "\n%s:(%s)\n", $tableName, join(', ', @colAttributes);
+    }
 }
 
 sub showTablesCommand
@@ -2976,12 +3155,13 @@ sub getRow
     eval {
         my $m        = $rset->getMetaData();
         my $colcnt   = $m->getColumnCount();
-
+#printf STDERR "getRow:  colcnt=%d\n", $colcnt;
         for (my $ii = 1; $ii <= $colcnt; $ii++) {
             next unless ($colmap[$ii-1]);   #skip if column is not selected
 
             #note - you have to do the fetch first, which sets wasNull() for the current column.
             my $str = $rset->getString($ii);
+#printf STDERR "\tgetRow:  str='%s'\n", $str;
 
             #if we are displaying xml rowsets...
             if ($xmldisplay) {
@@ -3140,8 +3320,15 @@ sub main
             printf STDERR "%s:[sqlsession]:  cannot get a database connection:  ABORT\n", $pkgname;
             return 1;
         } else {
-           #return zero status if sql_exec is successful:
-           return !( $psqlImpl->sql_exec($psqlImpl->getExecCommandString()) );
+
+            my $lbuf = $psqlImpl->getExecCommandString();
+
+            if ($psqlImpl->localCommand($lbuf)) {
+                #return zero status if execute is successful
+                return 0;
+            } else {
+                return !( $psqlImpl->sql_exec($lbuf) );
+            }
         }
     } elsif ($USE_STDIN) {
     #printf STDERR "%s:  using stdin\n", $pkgname;
@@ -3154,7 +3341,7 @@ sub main
                 $psqlImpl->sqlsession($infile, $SQLFILES[$ii]);
                 close $infile;
             } else {
-                printf STDERR "%s:  ERROR: cannot open sql input, '%s':  '%s'\n", $pkgname, $SQLFILES[$ii], $!;
+                printf STDERR "%s:  ERROR: cannot open sql input file, '%s':  '%s'\n", $pkgname, $SQLFILES[$ii], $!;
             }
         }
     }

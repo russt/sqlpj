@@ -29,7 +29,10 @@ OPTIONS
   -url name         Jdbc connection url
   -user name        Username used for connection
   -password string  Password for this user
+
+  -e string         Execute commands from "string" and exit.  Useful for timing commands.
   -prompt string    Use <string> as prompt instead of default.
+  -noprompt         Shorthand for -prompt ""
 
 ENVIRONMENT
  CLASSPATH      Java CLASSPATH, inherited by JDBC.pm
