@@ -1,10 +1,17 @@
+NOTES, 2/11/13
+
+o bug in large retrievals - e.g., failed when dumping ec_propery which has 4.8M records,
+  even with boosted java memory. also, double scan for column size is bad news for large dumps.
+o add option to eliminate or improve performance of column-sizes estimation setMaxColumnSizes().
+  use grep or map?  NOTE: this does not happen for xml display
+o implement csv feature!
+
+-----------------
 Some feature ideas, 2/8/13
 
 o for sql syntax errors, use the line/column numbers to generate a visual error message.
                                                          like this ^
-o set prompt to be the database connection instead of "sqlpj>"
-  i.e.,  mysql>, derbydb>, ora>, firebird>, etc.
-
+  Note, not all engines return line number/column info - derbydb does, mysql does not.
 -----------------
 DISTRIBUTION TODO:
 
@@ -38,6 +45,12 @@ o FEATURE: add index creation for show create [table] command.
 o FEATURE: ORACLE SUPPORT: test all features against ORACLE instance
 
 COMPLETED FEATURES:
+o add echo command
+  [DONE 2/9/13]
+o added schema command, -e commands no longer limited to sql
+  [DONE 2/9/13]
+o set prompt to be the database connection instead of "sqlpj>" i.e.,  mysql>, derbydb>, ora>, firebird>, etc.
+  [DONE 2/9/13]
 o FEATURE: arguments to set jdbc parameter, or -props <file> to read from a property file
   [DONE 5/16/07 IN=41191]
 o FEATURE: add -V (version) arg.
