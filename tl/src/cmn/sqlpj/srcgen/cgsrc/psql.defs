@@ -38,6 +38,7 @@ OPTIONS
   -e string         Execute commands from "string" and exit.  Useful for timing commands.
   -prompt string    Use <string> as prompt instead of default.
   -noprompt         Shorthand for -prompt ""
+  -nooutput         Supress output of query results (for testing query times).
 
 ENVIRONMENT
  CLASSPATH      Java CLASSPATH, inherited by JDBC.pm
@@ -113,14 +114,13 @@ if (!$psqlImpl->check_driver()) {
     return 1;
 }
 
-if ( $psqlImpl->getExecCommandString() ) {
+if ( $scfg->getExecCommandString() ) {
     #...if we have an immediate command to execute, then do it and exit:
     if (!$psqlImpl->sql_init_connection()) {
         printf STDERR "%s:[sqlsession]:  cannot get a database connection:  ABORT\n", $pkgname;
         return 1;
     } else {
-
-        my $lbuf = $psqlImpl->getExecCommandString();
+        my $lbuf = $scfg->getExecCommandString();
 
         if ($psqlImpl->localCommand($lbuf)) {
             #return zero status if execute is successful
@@ -296,6 +296,9 @@ PL_PARSE_ARGS_LOOP := << EOF
         printf STDERR "%s:  -url requires the JDBC connection url\n", $p;
         return 1;
     }
+} elsif ($flag =~ '^-nooutput') {
+    # supress output of query results (for testing query times)
+    $scfg->setSuppressOutput(1);
 } elsif ($flag =~ '^-noprompt') {
     # clear prompt, same as "-prompt ''"
     $scfg->setUserSuppliedPrompt('');

@@ -35,16 +35,17 @@ PL_OBJ_ATTRIBUTES := << EOF
 'mJdbcUser' => undef,
 'mJdbcPassword' => undef,
 'mJdbcPropsFileName' => undef,
-'mVersionNumber' => "1.0",
-'mVersionDate'   => "16-Oct-2007",
+'mVersionNumber' => "{=VERSION_STR=}",
+'mVersionDate'   => "{=VERSION_DATE=}",
 'mPathSeparator' => undef,
 'mDebug'         => 0,
 'mDDebug'        => 0,
 'mQuiet'         => 0,
 'mVerbose'       => 0,
-'mExecCommandString' => undef,
+'mExecCommandString' => undef,  #note - currently only used in main package.
+'mSuppressOutput' => 0,
 EOF
-#%evalmacro PL_OBJ_ATTRIBUTES PL_OBJ_ATTRIBUTES
+%evalmacro PL_OBJ_ATTRIBUTES PL_OBJ_ATTRIBUTES
 
 #this is for further initialzation of attributes, since hash init cannot be self-referential:
 PL_POST_ATTRIBUTE_INIT := << EOF
@@ -85,6 +86,8 @@ PL_ATTRIBUTE_NAME = Verbose
 PL_ATTRIBUTE_NAME = Quiet
 %evalmacro >> getset_methods pl_getset
 PL_ATTRIBUTE_NAME = ExecCommandString
+%evalmacro >> getset_methods pl_getset
+PL_ATTRIBUTE_NAME = SuppressOutput
 %evalmacro >> getset_methods pl_getset
 
 #generate read-only attributes:

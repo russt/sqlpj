@@ -42,9 +42,10 @@ PL_OBJ_ATTRIBUTES := << EOF
 'mJdbcUrl'     => $cfg->getJdbcUrl(),
 'mUser'        => $cfg->getJdbcUser(),
 'mPassword'    => $cfg->getJdbcPassword(),
+'mProgName'    => $cfg->getProgName(),
 'mPrompt'      => "{=SQLPJ_PACKAGE=}> ",
 'mUserSuppliedPrompt' => $cfg->getUserSuppliedPrompt(),
-'mExecCommandString' => $cfg->getExecCommandString(),
+'mSuppressOutput' => $cfg->getSuppressOutput(),
 'mConnection'  => undef,
 'mMetaData'    => undef,
 'mMetaFuncs'    => undef,
@@ -109,8 +110,6 @@ PL_ATTRIBUTE_NAME = CsvDisplay
 %evalmacro >> getset_methods pl_getset
 PL_ATTRIBUTE_NAME = HeaderSetting
 %evalmacro >> getset_methods pl_getset
-PL_ATTRIBUTE_NAME = ExecCommandString
-%evalmacro >> getset_methods pl_getset
 PL_ATTRIBUTE_NAME = Prompt
 %evalmacro >> getset_methods pl_getset
 
@@ -125,11 +124,15 @@ PL_ATTRIBUTE_NAME = User
 %evalmacro >> getset_methods pl_attr_method
 PL_ATTRIBUTE_NAME = Password
 %evalmacro >> getset_methods pl_attr_method
+PL_ATTRIBUTE_NAME = ProgName
+%evalmacro >> getset_methods pl_attr_method
 PL_ATTRIBUTE_NAME = PathSeparator
 %evalmacro >> getset_methods pl_attr_method
 PL_ATTRIBUTE_NAME = UserSuppliedPrompt
 %evalmacro >> getset_methods pl_attr_method
 PL_ATTRIBUTE_NAME = MetaFuncs
+%evalmacro >> getset_methods pl_attr_method
+PL_ATTRIBUTE_NAME = SuppressOutput
 %evalmacro >> getset_methods pl_attr_method
 
 {
@@ -234,7 +237,7 @@ sub sql_exec
             printf STDERR "\tsql_exec:  get results...\n" if ($DEBUG);
             $results = $stmt->getResultSet();
             printf STDERR "\tsql_exec:  display results...\n" if ($DEBUG);
-            $self->displayResultSet($results, &columnExcludeMap($results, ()));
+            $self->fastDisplayResultSet($results);
         } else {
             #no results - see if we have an update count
             printf STDERR "\tsql_exec:  no results...get update count\n" if ($DEBUG);
@@ -277,11 +280,10 @@ sub displayXmlResults
 #row elements may have undef values, in which case we do not display them
 #(this is the "absent rows" method in the spec).
 {
-    my ($self, $tblname, $rows) = @_;
+    my ($self, $tblname, $hdref, $rows) = @_;
 
     $tblname = "UNKNOWN_TABLE" if ($tblname eq "");
 
-    my $ii = 0;
     my $nrows = $#{$rows};
 
     my $indentlevel = 0;
@@ -291,19 +293,17 @@ sub displayXmlResults
     printf "%s<%s>\n", $indent, $tblname;
     $indentlevel++; $indent = $indentstr x $indentlevel;
 
-    #first row is the column names:
-    my $rref = $$rows[$ii++];
-    my (@headers) = @$rref;
+    #deref header row:
+    my (@headers) = @$hdref;
 
 #printf STDERR "nrows=%d headers=(%s)\n", $nrows, join(',', @headers);
 
     #foreach row of data:
-    for ($ii = $ii; $ii <= $nrows; $ii++) {
-
+    for (my $ii = 0; $ii <= $nrows; $ii++) {
         printf "%s<row>\n", $indent;
         $indentlevel++; $indent = $indentstr x $indentlevel;
 
-        $rref = $$rows[$ii];
+        my $rref = $$rows[$ii];
         #foreach column in the row:
         for (my $jj = 0; $jj <= $#$rref; $jj++) {
             #display the row unless it was SQL NULL:
@@ -320,8 +320,130 @@ sub displayXmlResults
     printf "%s</%s>\n", $indent, $tblname;
 }
 
+sub fastDisplayResultSet
+# this version is optimized for displaying large datasets without need for column exclude feature.
+# if -nooutput arg, then process but do not display.
+# return 1 if successful.
+{
+    my ($self, $rset) = @_;
+
+    return 0 unless defined($rset);
+
+    #this is a constant from the metadata for a given resultSet:
+    my $m        = $rset->getMetaData();
+    my $colcnt   = $m->getColumnCount();
+
+    my $tableName = &getTableName($rset);
+
+    printf "getHeaderSetting=%d\n", $self->getHeaderSetting() if ($DEBUG);
+
+    #we need headers to tag xml elements - make sure they are turned on:
+    $self->setHeaderSetting(1) if ($self->getXmlDisplay());
+
+    #save column headers unless we are not displaying::
+    my @headerRow = ();
+    if ($self->getHeaderSetting()) {
+        @headerRow = (1..$colcnt);
+        @headerRow = map {
+            $m->getColumnLabel($_);
+        } @headerRow;
+    }
+
+    #clever way to calculate the number of rows we have.
+    #but will it works with all drivers? RT 2/13/13
+    $rset->last();
+    my $nrows = $rset->getRow();
+    $rset->beforeFirst();
+
+    my @datarows = ();
+    $#datarows = $nrows-1;    #allocate the array to hold the results
+
+    my $dot = 0;
+    @datarows = map {
+        ++$dot;
+        print STDERR "." if (!$QUIET && !($dot % 1000));
+
+        $rset->next();
+
+        my @data = (1..$colcnt);
+        @data = map {
+            $rset->getString($_);
+        } @data;
+
+        \@data;    #result of calculation is an array ref.
+    } @datarows;
+
+    print STDERR "\n" if (!$QUIET && $dot >= 1000);
+
+    if ($self->suppressOutput) {
+        printf STDERR "%s: INFO: supressing display of %d query results (-nooutput specified).\n", $self->progName(), $dot;
+        return 1;
+    }
+
+    ########
+    #XML/SQL if set:
+    ########
+    if ($self->getXmlDisplay()) {
+        return $self->displayXmlResults($tableName, \@headerRow, \@datarows);
+    }
+
+    #for a normal (non-xml) display, we have to loop through the results to set max column width.
+    my (@sizes) = ();
+    if ($self->getHeaderSetting()) {
+        for (\@headerRow, @datarows) {
+            &setMaxColumnSizes(\@sizes, $_);
+        }
+    } else {
+        for (@datarows) {
+            &setMaxColumnSizes(\@sizes, $_);
+        }
+    }
+
+    #generate a format spec based on display sizes:
+    my $fmt = "|";
+    my $total = 0;
+    for my $sz (@sizes) {
+        $fmt .= "%-" . "$sz" . "s|";
+        $total +=  $sz;
+    }
+
+    #create a row divider:
+    my $divider =  "+" . "-" x ($#sizes + $total) . "+" . "\n";
+
+#printf STDERR "fmt='%s' divider=\n%s\n", $fmt, $divider;
+
+    my $rowref = undef;
+
+    #######
+    #column headers:
+    #######
+    if ($self->getHeaderSetting()) {
+        print $divider;
+        printf $fmt. "\n", @headerRow;
+        print $divider;
+    }
+
+    {
+        # since we expect to have data with newlines in it, we turn off
+        # "Newline in left-justified string for printf ..." warnings for this block only:
+
+        no warnings 'printf';
+
+        #display data:
+        while (defined($rowref =  shift(@datarows))) {
+            printf $fmt. "\n", map { defined($_) ? $_ : "(NULL)" } @{$rowref};
+            #printf $fmt. "\n", @{$rowref};
+        }
+        print $divider if ($self->getHeaderSetting());
+    }
+
+    return 1;    #success
+}
+
 sub displayResultSet
 # display resultSet <rset>
+# note:  this version is used in the table & schema commands and
+#        requires <colmap> list to filter the column display.
 {
     my ($self, $rset, @colmap) = @_;
 
@@ -332,6 +454,9 @@ sub displayResultSet
     
     printf "getHeaderSetting=%d\n", $self->getHeaderSetting() if ($DEBUG);
 
+    #we need headers to tag xml elements - make sure they are turned on:
+    $self->setHeaderSetting(1) if ($self->getXmlDisplay());
+
     #save column headers unless we are not displaying::
     push @allrows, [&getColumns($rset, @colmap)] if ($self->getHeaderSetting());
 
@@ -340,11 +465,9 @@ sub displayResultSet
     #save data rows:
     my $dot = 0;
     while ($rset->next()) {
+        ++$dot;
         push @allrows, getRow($rset, $self->getXmlDisplay(), @colmap);
-
-        if (!$QUIET && !($dot++ % 1000)) {
-            print STDERR ".";
-        }
+        print STDERR "." if (!$QUIET && !($dot % 1000));
     }
     print STDERR "\n" if (!$QUIET && $dot >= 1000);
 
@@ -352,7 +475,8 @@ sub displayResultSet
     #XML/SQL if set:
     ########
     if ($self->getXmlDisplay()) {
-        return $self->displayXmlResults($tableName, \@allrows);
+        my $hdref = shift @allrows;
+        return $self->displayXmlResults($tableName, $hdref, \@allrows);
     }
 
     #next, we iterate through the rows to set the max column size:
@@ -697,6 +821,7 @@ sub setCommand
         if ($buf eq "" || $buf =~ /^on/i) {
             if (!$self->getXmlDisplay()) {
                 $self->setXmlDisplay(1);
+                $self->setHeaderSetting(1);    #xml display requires column headings.
                 $howsay = "is now";
             }
         } elsif ($buf =~ /^off/i) {
@@ -1459,6 +1584,7 @@ sub getColumns
     return () unless defined($rset);
 
     my (@header) = ();
+
 #printf STDERR "getColumns:  #colmap=%d colmap=(%s)\n", $#colmap, join(",", @colmap);
 
     eval {
@@ -1650,7 +1776,7 @@ sub setMaxColumnSizes
     }
 
     for (my $ii = 0; $ii <= $#data; $ii++) {
-        $sizes[$ii] = &maxwidth( $sizes[$ii], length(sprintf("%s", $data[$ii])) );
+        $sizes[$ii] = &maxwidth( $sizes[$ii], length(sprintf("%s", (defined($data[$ii]) ? $data[$ii] : "(NULL)"))) );
     }
 
     @{$szref} = @sizes;

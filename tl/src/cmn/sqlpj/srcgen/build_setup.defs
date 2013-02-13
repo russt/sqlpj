@@ -1,6 +1,13 @@
 #return if already included:
 %ifdef BUILD_SETUP_COMPLETE %return
 
+###########
+# note - version is initialized in pkgconfig.defs
+# TODO:  initialize these from:  cvs log -h psqlImpl.defs
+VERSION_STR  = 1.33
+VERSION_DATE = 13-Feb-2013
+###########
+
 %pragma trim_multiline_rnewline 1
 
 #defaults if not defined by caller:
