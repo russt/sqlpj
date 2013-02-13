@@ -227,12 +227,17 @@ sub sql_exec
 
         my $updateCount = -1;
 
+        printf STDERR "sql_exec: BEGIN exceute...\n" if ($DEBUG);
+
         #if we have results...
         if ($stmt->execute($sqlbuf)) {
+            printf STDERR "\tsql_exec:  get results...\n" if ($DEBUG);
             $results = $stmt->getResultSet();
+            printf STDERR "\tsql_exec:  display results...\n" if ($DEBUG);
             $self->displayResultSet($results, &columnExcludeMap($results, ()));
         } else {
             #no results - see if we have an update count
+            printf STDERR "\tsql_exec:  no results...get update count\n" if ($DEBUG);
             $updateCount = $stmt->getUpdateCount();
 
             #if we have an update count...
@@ -241,6 +246,7 @@ sub sql_exec
             }
         }
     };
+    printf STDERR "sql_exec: END exceute.\n" if ($DEBUG);
 
     if ($@) {
         if (Inline::Java::caught("java.lang.Exception")) {
@@ -324,7 +330,7 @@ sub displayResultSet
     #we first make a pass to get all the rows into memory:
     my @allrows = ();
     
-#printf "getHeaderSetting=%d\n", $self->getHeaderSetting();
+    printf "getHeaderSetting=%d\n", $self->getHeaderSetting() if ($DEBUG);
 
     #save column headers unless we are not displaying::
     push @allrows, [&getColumns($rset, @colmap)] if ($self->getHeaderSetting());
@@ -332,9 +338,15 @@ sub displayResultSet
     my $tableName = &getTableName($rset);
 
     #save data rows:
+    my $ii = 0;
     while ($rset->next()) {
-        push @allrows, [&getRow($rset, $self->getXmlDisplay(), @colmap)];
+        push @allrows, getRow($rset, $self->getXmlDisplay(), @colmap);
+        if ($DEBUG && $ii++ >= 1000) {
+            print STDERR ".";
+            $ii = 0;
+        }
     }
+    print STDERR "\n" if ($DEBUG);
 
     ########
     #XML/SQL if set:
@@ -593,6 +605,20 @@ Local commands are:
  help                 - show this message.
  echo [text]          - display <text>.  Useful for scripts to insert documentation.
 
+ tables [db]          - show information about tables in <db>, defaults to connection db.
+                        (similar to "show tables" in mysql).
+ table name [db]      - show information about table <name> in <db>, defaults to connection db.
+                        (can also use "describe <table>" in mysql & oracle).
+                        (can also use "show columns from <table>" in mysql).
+
+ schema               - display a consise schema of the database.
+
+ show conn[ection]    - show jdbc connection properties, including product & version
+ show create [table]  - generate sql to create all tables, or a single table.
+ show ind[ices] table - show the indices for a single table
+ show db              - show db name
+ show metadata        - show jdbc metadata (long)
+
  set csv [on]         - output tables as comma-separated data.
  set csv off          - turn off csv output display.
 
@@ -602,19 +628,8 @@ Local commands are:
  set xml [on]         - output result-sets in sql/xml form.
  set xml off          - turn off xml output of result-sets.
 
- tables [db]          - show information about tables in <db>, defaults to connection db.
-                        (similar to "show tables" in mysql).
- table name [db]      - show information about table <name> in <db>, defaults to connection db.
-                        (can also use "describe <table>" in mysql & oracle).
-                        (can also use "show columns from <table>" in mysql).
-
- schema               - display a consise schema of the database (mysql only).
-
- show conn[ection]    - show jdbc connection properties, including product & version
- show create [table]  - generate sql to create all tables, or a single table.
- show ind[ices] table - show the indices for a single table
- show db              - show db name
- show metadata        - show jdbc metadata (long)
+ NOTES on `set':      Do not include `;' in a local set commands, to avoid interpretation as SQL.
+                      Unrecognized `set' commands (e.g. Derby "SET SCHEMA") are also passed to SQL.
 !
 
 #not yet implemented:
@@ -673,7 +688,10 @@ sub setCommand
 {
     my ($self, $buf) = @_;
 
-    if ($buf =~ /^xml/i) {
+    if ($buf =~ /;/) {
+        #we assume it is a database command and pass it to sql:
+        return 0;
+    } elsif ($buf =~ /^xml/i) {
         $buf =~ s/xml\s*//i;
         my $howsay = "remains";
         if ($buf eq "" || $buf =~ /^on/i) {
@@ -730,7 +748,8 @@ sub setCommand
         printf STDOUT "HEADER output %s %s\n",
             $howsay, $self->getHeaderSetting()? "ON" : "OFF" unless($QUIET);
     } else {
-        printf STDERR "%s: ERROR: set '%s' not recognized - ignored.\n", $pkgname, $buf;
+        #not an internal set - maybe it is sql:
+        return 0;
     }
 
     return 1;    #we found and processed a set command
@@ -1023,7 +1042,7 @@ sub getTableAttributes
     #foreach result set ...
     my @allrows = ();
     while ($rseta->next()) {
-        push @allrows, [getRow($rseta, 0, columnExcludeMap($rseta, @excludenames))] ;
+        push @allrows, getRow($rseta, 0, columnExcludeMap($rseta, @excludenames));
     }
 
     my @tableColumnDescriptions = ();
@@ -1045,10 +1064,10 @@ sub showSchemaCommand
 
     my $dbMetaData = $self->getMetaData();
 
-    if (!$self->getIsMysql()) {
-        printf STDERR "sorry, schema command is only implemented for mysql.\n";
-        return 1;
-    }
+#   if (!$self->getIsMysql()) {
+#       printf STDERR "sorry, schema command is only implemented for mysql.\n";
+#       return 1;
+#   }
 
     my $rseta = undef;
     my $rsetb = undef;
@@ -1096,7 +1115,7 @@ sub showSchemaCommand
     #$self->displayResultSet($rseta, &columnExcludeMap($rseta, @excludenames));
     my @allrows = ();
     while ($rseta->next()) {
-        push @allrows, [getRow($rseta, 0, columnExcludeMap($rseta, @excludenames))] ;
+        push @allrows, getRow($rseta, 0, columnExcludeMap($rseta, @excludenames));
     }
 
     my @tables = ();
@@ -1168,9 +1187,10 @@ sub showTablesCommand
 
     #show the tables from the named database:
     eval {
-        my @list = ("TABLE","SYSTEM TABLE","VIEW");
-        @list = ("TABLE");
-        $rseta = $dbMetaData->getTables(undef, undef, "%", [@list]);
+        $rseta = $dbMetaData->getTables(undef, undef, "%", undef);
+        #my @list = ("TABLE","SYSTEM TABLE","VIEW");
+        #@list = ("TABLE");
+        #$rseta = $dbMetaData->getTables(undef, undef, "%", [@list]);
         #$rseta = $dbMetaData->getTables(undef, undef, "%", ["TABLE","SYSTEM TABLE","VIEW"]);
         #$rseta = $dbMetaData->getTables(undef, undef, "%", ["TABLE"]);
         #$rseta = $dbMetaData->getTables($dbname, "%", "%", []);
@@ -1565,19 +1585,29 @@ sub getRow
         my $m        = $rset->getMetaData();
         my $colcnt   = $m->getColumnCount();
 #printf STDERR "getRow:  colcnt=%d\n", $colcnt;
-        for (my $ii = 1; $ii <= $colcnt; $ii++) {
-            next unless ($colmap[$ii-1]);   #skip if column is not selected
 
-            #note - you have to do the fetch first, which sets wasNull() for the current column.
-            my $str = $rset->getString($ii);
-#printf STDERR "\tgetRow:  str='%s'\n", $str;
+        my $str = undef;
+        if ($xmldisplay) {
+            for (my $ii = 1; $ii <= $colcnt; $ii++) {
+                next unless ($colmap[$ii-1]);   #skip if column is not selected
 
-            #if we are displaying xml rowsets...
-            if ($xmldisplay) {
-                #...then set SQL NULL elements to undef:
+                #note - you have to do the fetch first, which sets wasNull() for the current column.
+                $str = $rset->getString($ii);
+                #printf STDERR "\tgetRow:  str='%s'\n", $str if ($DEBUG);
+
+                #we are displaying xml rowsets - set SQL NULL elements to undef:
                 push @data, ($rset->wasNull() ? undef : $str);
-            } else {
-                #otherwise, we will display the string "(NULL)":
+            }
+        } else {
+            for (my $ii = 1; $ii <= $colcnt; $ii++) {
+                next unless ($colmap[$ii-1]);   #skip if column is not selected
+
+                #note - you have to do the fetch first, which sets wasNull() for the current column.
+                $str = $rset->getString($ii);
+
+                #printf STDERR "\tgetRow:  str='%s'\n", $str if ($DEBUG);
+
+                #not displaying xml rowsets - display the string "(NULL)":
                 push @data, ($rset->wasNull() ? "(NULL)" : $str);
             }
         }
@@ -1601,7 +1631,7 @@ sub getRow
         return ();  #empty list
     }
 
-    return @data;
+    return \@data;
 }
 
 sub setMaxColumnSizes

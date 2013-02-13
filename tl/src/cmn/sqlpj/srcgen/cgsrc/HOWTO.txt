@@ -1,3 +1,50 @@
+Q:  how to get list of all tables in different db's?
+derbydb> select * from SYS.SYSTABLES;
++--------------------------------------------------------------------------------------------------------------------+
+|TABLEID                             |TABLENAME       |TABLETYPE|SCHEMAID                            |LOCKGRANULARITY|
++--------------------------------------------------------------------------------------------------------------------+
+|80000010-00d0-fd77-3ed8-000a0a0b1900|SYSCONGLOMERATES|S        |8000000d-00d0-fd77-3ed8-000a0a0b1900|R              |
+|80000018-00d0-fd77-3ed8-000a0a0b1900|SYSTABLES       |S        |8000000d-00d0-fd77-3ed8-000a0a0b1900|R              |
+...
++--------------------------------------------------------------------------------------------------------------------+
+
+NOTE:  I'm using jdbc metadata:
+    ResultSet resultSet = dbmd.getTables(null, null, "%", null); 
+#this doesn't work consistently, i.e., in derbydb it returns nothing in an empty db:
+    String[] types = {"TABLE"}; 
+    ResultSet resultSet = dbmd.getTables(null, null, "%", types); 
+
+===============================
+FROM db-derby-user mailing list:
+===============================
+solution 1:
+select * from SYS.SYSTABLES;   -- this will show all the tables of database.
+
+solution 2:
+select s.schemaname || '.' || t.tablename  
+     from sys.systables t, sys.sysschemas s  
+     where t.schemaid = s.schemaid 
+          and t.tabletype = 'T' 
+     order by s.schemaname, t.tablename;   -- this will show all the tables created by users.
+
+solution 3:
+The 10.2 release adds 'show tables' and 'describe' commands to ij.
+===============================
+
+Q:  how to get the database name in different db's?
+derbydb> values CURRENT SCHEMA;
++----+
+|1   |
++----+
+|TEST|
++----+
+mysql> select database();
++----------+
+|database()|
++----------+
+|mysql     |
++----------+
+
 Q:  how to get the time in different db's?
 mysql> select current_time;
 +------------+
