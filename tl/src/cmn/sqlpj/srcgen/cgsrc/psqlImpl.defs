@@ -338,15 +338,15 @@ sub displayResultSet
     my $tableName = &getTableName($rset);
 
     #save data rows:
-    my $ii = 0;
+    my $dot = 0;
     while ($rset->next()) {
         push @allrows, getRow($rset, $self->getXmlDisplay(), @colmap);
-        if ($DEBUG && $ii++ >= 1000) {
+
+        if (!$QUIET && !($dot++ % 1000)) {
             print STDERR ".";
-            $ii = 0;
         }
     }
-    print STDERR "\n" if ($DEBUG);
+    print STDERR "\n" if (!$QUIET && $dot >= 1000);
 
     ########
     #XML/SQL if set:
@@ -1596,7 +1596,8 @@ sub getRow
                 #printf STDERR "\tgetRow:  str='%s'\n", $str if ($DEBUG);
 
                 #we are displaying xml rowsets - set SQL NULL elements to undef:
-                push @data, ($rset->wasNull() ? undef : $str);
+                #push @data, ($rset->wasNull() ? undef : $str);
+                push @data, $str;
             }
         } else {
             for (my $ii = 1; $ii <= $colcnt; $ii++) {
@@ -1608,7 +1609,8 @@ sub getRow
                 #printf STDERR "\tgetRow:  str='%s'\n", $str if ($DEBUG);
 
                 #not displaying xml rowsets - display the string "(NULL)":
-                push @data, ($rset->wasNull() ? "(NULL)" : $str);
+                #push @data, ($rset->wasNull() ? "(NULL)" : $str);
+                push @data, (defined($str) ?  $str : "(NULL)");
             }
         }
     };
