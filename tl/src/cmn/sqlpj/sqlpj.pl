@@ -3696,8 +3696,6 @@ sub parse_args
                 $scfg->getProgName(), $scfg->versionNumber(), $scfg->versionDate();
             $HELPFLAG = 1;    #display version and exit.
             return 0;
-        } elsif ($flag =~ '^-q') {
-            $QUIET = 1;
         } elsif ($flag =~ '^-user') {
             # -user name        Username used for connection
             if ($#ARGV+1 > 0 && $ARGV[0] !~ /^-/) {
@@ -3774,6 +3772,8 @@ sub parse_args
             $DDEBUGFLAG = 1;
         } elsif ($flag =~ '^-v') {
             $VERBOSE = 1;
+        } elsif ($flag =~ '^-q') {
+            $QUIET = 1;
         } elsif ($flag =~ '^-h') {
             $HELPFLAG = 1;
             return &usage(0);
