@@ -1,3 +1,18 @@
+NOTES, 2/13/13
+
+o implement show db command for derby db (see HOWTO.txt).
+o take another look at how to implement tables command for derby - now it is
+  returning system tables and user tables.  prob. don't want that.
+o add queries for tourdb tables with xml on and off.
+o need to test that the rowset nrows calculation works with other drivers
+  (look for /$rset->last()/ call).
+o add doc for PERL_INLINE_JAVA_EXTRA_JAVA_ARGS (e.g. -Xmx1024m) in -help message.
+o refactor common display code between fastDisplayResultSet() and displayResultSet()
+o can also improve setMaxColumnSizes() but little evidence it will help much.
+o see README_OPTIMIZE.txt for results of optimization efforts.  Bottom line is most time
+  is spent in Inline::Java calls retrieving the table cells, and not in perl, though
+  improvements to the perl code help (as usual eliminating loops).
+
 NOTES, 2/11/13
 
 o bug in large retrievals - e.g., failed when dumping ec_propery which has 4.8M records,

@@ -33,6 +33,7 @@ OPTIONS
   -e string         Execute commands from "string" and exit.  Useful for timing commands.
   -prompt string    Use <string> as prompt instead of default.
   -noprompt         Shorthand for -prompt ""
+  -nooutput         Supress output of query results (for testing query times).
 
 ENVIRONMENT
  CLASSPATH      Java CLASSPATH, inherited by JDBC.pm

@@ -1,15 +1,38 @@
 TESTNAME is sqlpj00007
-+----------------------------------------------------------------------------------------------------+
-|TABLE_NAME        |TABLE_TYPE|TYPE_CAT|TYPE_SCHEM|TYPE_NAME|SELF_REFERENCING_COL_NAME|REF_GENERATION|
-+----------------------------------------------------------------------------------------------------+
-|AIRLINES          |TABLE     |(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
-|CITIES            |TABLE     |(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
-|COUNTRIES         |TABLE     |(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
-|FLIGHTAVAILABILITY|TABLE     |(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
-|FLIGHTS           |TABLE     |(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
-|FLIGHTS_HISTORY   |TABLE     |(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
-|MAPS              |TABLE     |(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
-+----------------------------------------------------------------------------------------------------+
++------------------------------------------------------------------------------------------------------+
+|TABLE_NAME        |TABLE_TYPE  |TYPE_CAT|TYPE_SCHEM|TYPE_NAME|SELF_REFERENCING_COL_NAME|REF_GENERATION|
++------------------------------------------------------------------------------------------------------+
+|SYSALIASES        |SYSTEM TABLE|(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
+|SYSCHECKS         |SYSTEM TABLE|(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
+|SYSCOLPERMS       |SYSTEM TABLE|(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
+|SYSCOLUMNS        |SYSTEM TABLE|(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
+|SYSCONGLOMERATES  |SYSTEM TABLE|(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
+|SYSCONSTRAINTS    |SYSTEM TABLE|(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
+|SYSDEPENDS        |SYSTEM TABLE|(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
+|SYSFILES          |SYSTEM TABLE|(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
+|SYSFOREIGNKEYS    |SYSTEM TABLE|(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
+|SYSKEYS           |SYSTEM TABLE|(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
+|SYSPERMS          |SYSTEM TABLE|(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
+|SYSROLES          |SYSTEM TABLE|(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
+|SYSROUTINEPERMS   |SYSTEM TABLE|(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
+|SYSSCHEMAS        |SYSTEM TABLE|(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
+|SYSSEQUENCES      |SYSTEM TABLE|(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
+|SYSSTATEMENTS     |SYSTEM TABLE|(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
+|SYSSTATISTICS     |SYSTEM TABLE|(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
+|SYSTABLEPERMS     |SYSTEM TABLE|(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
+|SYSTABLES         |SYSTEM TABLE|(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
+|SYSTRIGGERS       |SYSTEM TABLE|(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
+|SYSUSERS          |SYSTEM TABLE|(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
+|SYSVIEWS          |SYSTEM TABLE|(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
+|SYSDUMMY1         |SYSTEM TABLE|(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
+|AIRLINES          |TABLE       |(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
+|CITIES            |TABLE       |(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
+|COUNTRIES         |TABLE       |(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
+|FLIGHTAVAILABILITY|TABLE       |(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
+|FLIGHTS           |TABLE       |(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
+|FLIGHTS_HISTORY   |TABLE       |(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
+|MAPS              |TABLE       |(NULL)  |(NULL)    |(NULL)   |(NULL)                   |(NULL)        |
++------------------------------------------------------------------------------------------------------+
 +--------------------------+
 |TABLE_NAME|SUPERTABLE_NAME|
 +--------------------------+

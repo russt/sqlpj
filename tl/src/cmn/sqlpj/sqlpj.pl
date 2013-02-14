@@ -926,14 +926,15 @@ sub new
         'mJdbcUser' => undef,
         'mJdbcPassword' => undef,
         'mJdbcPropsFileName' => undef,
-        'mVersionNumber' => "1.0",
-        'mVersionDate'   => "16-Oct-2007",
+        'mVersionNumber' => "1.33",
+        'mVersionDate'   => "13-Feb-2013",
         'mPathSeparator' => undef,
         'mDebug'         => 0,
         'mDDebug'        => 0,
         'mQuiet'         => 0,
         'mVerbose'       => 0,
-        'mExecCommandString' => undef,
+        'mExecCommandString' => undef,  #note - currently only used in main package.
+        'mSuppressOutput' => 0,
         }, $class;
 
     #post-attribute init after we bless our $self (allows use of accessor methods):
@@ -1228,6 +1229,21 @@ sub setExecCommandString
     return $self->{'mExecCommandString'};
 }
 
+sub getSuppressOutput
+#return value of SuppressOutput
+{
+    my ($self) = @_;
+    return $self->{'mSuppressOutput'};
+}
+
+sub setSuppressOutput
+#set value of SuppressOutput and return value.
+{
+    my ($self, $value) = @_;
+    $self->{'mSuppressOutput'} = $value;
+    return $self->{'mSuppressOutput'};
+}
+
 sub versionNumber
 #return value of mVersionNumber
 {
@@ -1277,9 +1293,10 @@ sub new
         'mJdbcUrl'     => $cfg->getJdbcUrl(),
         'mUser'        => $cfg->getJdbcUser(),
         'mPassword'    => $cfg->getJdbcPassword(),
+        'mProgName'    => $cfg->getProgName(),
         'mPrompt'      => "sqlpj> ",
         'mUserSuppliedPrompt' => $cfg->getUserSuppliedPrompt(),
-        'mExecCommandString' => $cfg->getExecCommandString(),
+        'mSuppressOutput' => $cfg->getSuppressOutput(),
         'mConnection'  => undef,
         'mMetaData'    => undef,
         'mMetaFuncs'    => undef,
@@ -1568,12 +1585,17 @@ sub sql_exec
 
         my $updateCount = -1;
 
+        printf STDERR "sql_exec: BEGIN exceute...\n" if ($DEBUG);
+
         #if we have results...
         if ($stmt->execute($sqlbuf)) {
+            printf STDERR "\tsql_exec:  get results...\n" if ($DEBUG);
             $results = $stmt->getResultSet();
-            $self->displayResultSet($results, &columnExcludeMap($results, ()));
+            printf STDERR "\tsql_exec:  display results...\n" if ($DEBUG);
+            $self->fastDisplayResultSet($results);
         } else {
             #no results - see if we have an update count
+            printf STDERR "\tsql_exec:  no results...get update count\n" if ($DEBUG);
             $updateCount = $stmt->getUpdateCount();
 
             #if we have an update count...
@@ -1582,6 +1604,7 @@ sub sql_exec
             }
         }
     };
+    printf STDERR "sql_exec: END exceute.\n" if ($DEBUG);
 
     if ($@) {
         if (Inline::Java::caught("java.lang.Exception")) {
@@ -1612,11 +1635,10 @@ sub displayXmlResults
 #row elements may have undef values, in which case we do not display them
 #(this is the "absent rows" method in the spec).
 {
-    my ($self, $tblname, $rows) = @_;
+    my ($self, $tblname, $hdref, $rows) = @_;
 
     $tblname = "UNKNOWN_TABLE" if ($tblname eq "");
 
-    my $ii = 0;
     my $nrows = $#{$rows};
 
     my $indentlevel = 0;
@@ -1626,19 +1648,17 @@ sub displayXmlResults
     printf "%s<%s>\n", $indent, $tblname;
     $indentlevel++; $indent = $indentstr x $indentlevel;
 
-    #first row is the column names:
-    my $rref = $$rows[$ii++];
-    my (@headers) = @$rref;
+    #deref header row:
+    my (@headers) = @$hdref;
 
 #printf STDERR "nrows=%d headers=(%s)\n", $nrows, join(',', @headers);
 
     #foreach row of data:
-    for ($ii = $ii; $ii <= $nrows; $ii++) {
-
+    for (my $ii = 0; $ii <= $nrows; $ii++) {
         printf "%s<row>\n", $indent;
         $indentlevel++; $indent = $indentstr x $indentlevel;
 
-        $rref = $$rows[$ii];
+        my $rref = $$rows[$ii];
         #foreach column in the row:
         for (my $jj = 0; $jj <= $#$rref; $jj++) {
             #display the row unless it was SQL NULL:
@@ -1655,8 +1675,130 @@ sub displayXmlResults
     printf "%s</%s>\n", $indent, $tblname;
 }
 
+sub fastDisplayResultSet
+# this version is optimized for displaying large datasets without need for column exclude feature.
+# if -nooutput arg, then process but do not display.
+# return 1 if successful.
+{
+    my ($self, $rset) = @_;
+
+    return 0 unless defined($rset);
+
+    #this is a constant from the metadata for a given resultSet:
+    my $m        = $rset->getMetaData();
+    my $colcnt   = $m->getColumnCount();
+
+    my $tableName = &getTableName($rset);
+
+    printf STDERR "getHeaderSetting=%d\n", $self->getHeaderSetting() if ($DEBUG);
+
+    #we need headers to tag xml elements - make sure they are turned on:
+    $self->setHeaderSetting(1) if ($self->getXmlDisplay());
+
+    #save column headers unless we are not displaying::
+    my @headerRow = ();
+    if ($self->getHeaderSetting()) {
+        @headerRow = (1..$colcnt);
+        @headerRow = map {
+            $m->getColumnLabel($_);
+        } @headerRow;
+    }
+
+    #clever way to calculate the number of rows we have.
+    #but will it works with all drivers? RT 2/13/13
+    $rset->last();
+    my $nrows = $rset->getRow();
+    $rset->beforeFirst();
+
+    my @datarows = ();
+    $#datarows = $nrows-1;    #allocate the array to hold the results
+
+    my $dot = 0;
+    @datarows = map {
+        ++$dot;
+        print STDERR "." if (!$QUIET && !($dot % 1000));
+
+        $rset->next();
+
+        my @data = (1..$colcnt);
+        @data = map {
+            $rset->getString($_);
+        } @data;
+
+        \@data;    #result of calculation is an array ref.
+    } @datarows;
+
+    print STDERR "\n" if (!$QUIET && $dot >= 1000);
+
+    if ($self->suppressOutput) {
+        printf STDERR "%s: INFO: supressing display of %d query results (-nooutput specified).\n", $self->progName(), $dot;
+        return 1;
+    }
+
+    ########
+    #XML/SQL if set:
+    ########
+    if ($self->getXmlDisplay()) {
+        return $self->displayXmlResults($tableName, \@headerRow, \@datarows);
+    }
+
+    #for a normal (non-xml) display, we have to loop through the results to set max column width.
+    my (@sizes) = ();
+    if ($self->getHeaderSetting()) {
+        for (\@headerRow, @datarows) {
+            &setMaxColumnSizes(\@sizes, $_);
+        }
+    } else {
+        for (@datarows) {
+            &setMaxColumnSizes(\@sizes, $_);
+        }
+    }
+
+    #generate a format spec based on display sizes:
+    my $fmt = "|";
+    my $total = 0;
+    for my $sz (@sizes) {
+        $fmt .= "%-" . "$sz" . "s|";
+        $total +=  $sz;
+    }
+
+    #create a row divider:
+    my $divider =  "+" . "-" x ($#sizes + $total) . "+" . "\n";
+
+#printf STDERR "fmt='%s' divider=\n%s\n", $fmt, $divider;
+
+    my $rowref = undef;
+
+    #######
+    #column headers:
+    #######
+    if ($self->getHeaderSetting()) {
+        print $divider;
+        printf $fmt. "\n", @headerRow;
+        print $divider;
+    }
+
+    {
+        # since we expect to have data with newlines in it, we turn off
+        # "Newline in left-justified string for printf ..." warnings for this block only:
+
+        no warnings 'printf';
+
+        #display data:
+        while (defined($rowref =  shift(@datarows))) {
+            printf $fmt. "\n", map { defined($_) ? $_ : "(NULL)" } @{$rowref};
+            #printf $fmt. "\n", @{$rowref};
+        }
+        print $divider if ($self->getHeaderSetting());
+    }
+
+    return 1;    #success
+}
+
 sub displayResultSet
 # display resultSet <rset>
+# note:  this version is used in the table & schema commands and
+#        requires <colmap> list to filter the column display.
 {
     my ($self, $rset, @colmap) = @_;
 
@@ -1665,7 +1807,10 @@ sub displayResultSet
     #we first make a pass to get all the rows into memory:
     my @allrows = ();
     
-#printf "getHeaderSetting=%d\n", $self->getHeaderSetting();
+    printf "getHeaderSetting=%d\n", $self->getHeaderSetting() if ($DEBUG);
+
+    #we need headers to tag xml elements - make sure they are turned on:
+    $self->setHeaderSetting(1) if ($self->getXmlDisplay());
 
     #save column headers unless we are not displaying::
     push @allrows, [&getColumns($rset, @colmap)] if ($self->getHeaderSetting());
@@ -1673,15 +1818,20 @@ sub displayResultSet
     my $tableName = &getTableName($rset);
 
     #save data rows:
+    my $dot = 0;
     while ($rset->next()) {
-        push @allrows, [&getRow($rset, $self->getXmlDisplay(), @colmap)];
+        ++$dot;
+        push @allrows, getRow($rset, $self->getXmlDisplay(), @colmap);
+        print STDERR "." if (!$QUIET && !($dot % 1000));
     }
+    print STDERR "\n" if (!$QUIET && $dot >= 1000);
 
     ########
     #XML/SQL if set:
     ########
     if ($self->getXmlDisplay()) {
-        return $self->displayXmlResults($tableName, \@allrows);
+        my $hdref = shift @allrows;
+        return $self->displayXmlResults($tableName, $hdref, \@allrows);
     }
 
     #next, we iterate through the rows to set the max column size:
@@ -1836,7 +1986,7 @@ sub sql_init_connection
         return 0;
     }
 
-    printf "isOracle=%d isMySql=%d isDerby=%d isFirebird=%d\n", $self->getIsOracle(), $self->getIsMysql(), $self->getIsDerby(), $self->getIsFirebird() if ($DEBUG);
+    printf STDERR "isOracle=%d isMySql=%d isDerby=%d isFirebird=%d\n", $self->getIsOracle(), $self->getIsMysql(), $self->getIsDerby(), $self->getIsFirebird() if ($DEBUG);
 
     #init or re-init our tables object:
     $self->setSqlTables( new sqltables($self->getMetaData(), $self->getDatabaseName()) );
@@ -1934,6 +2084,20 @@ Local commands are:
  help                 - show this message.
  echo [text]          - display <text>.  Useful for scripts to insert documentation.
 
+ tables [db]          - show information about tables in <db>, defaults to connection db.
+                        (similar to "show tables" in mysql).
+ table name [db]      - show information about table <name> in <db>, defaults to connection db.
+                        (can also use "describe <table>" in mysql & oracle).
+                        (can also use "show columns from <table>" in mysql).
+
+ schema               - display a consise schema of the database.
+
+ show conn[ection]    - show jdbc connection properties, including product & version
+ show create [table]  - generate sql to create all tables, or a single table.
+ show ind[ices] table - show the indices for a single table
+ show db              - show db name
+ show metadata        - show jdbc metadata (long)
+
  set csv [on]         - output tables as comma-separated data.
  set csv off          - turn off csv output display.
 
@@ -1943,19 +2107,8 @@ Local commands are:
  set xml [on]         - output result-sets in sql/xml form.
  set xml off          - turn off xml output of result-sets.
 
- tables [db]          - show information about tables in <db>, defaults to connection db.
-                        (similar to "show tables" in mysql).
- table name [db]      - show information about table <name> in <db>, defaults to connection db.
-                        (can also use "describe <table>" in mysql & oracle).
-                        (can also use "show columns from <table>" in mysql).
-
- schema               - display a consise schema of the database (mysql only).
-
- show conn[ection]    - show jdbc connection properties, including product & version
- show create [table]  - generate sql to create all tables, or a single table.
- show ind[ices] table - show the indices for a single table
- show db              - show db name
- show metadata        - show jdbc metadata (long)
+ NOTES on `set':      Do not include `;' in a local set commands, to avoid interpretation as SQL.
+                      Unrecognized `set' commands (e.g. Derby "SET SCHEMA") are also passed to SQL.
 !
 
 #not yet implemented:
@@ -2014,12 +2167,16 @@ sub setCommand
 {
     my ($self, $buf) = @_;
 
-    if ($buf =~ /^xml/i) {
+    if ($buf =~ /;/) {
+        #we assume it is a database command and pass it to sql:
+        return 0;
+    } elsif ($buf =~ /^xml/i) {
         $buf =~ s/xml\s*//i;
         my $howsay = "remains";
         if ($buf eq "" || $buf =~ /^on/i) {
             if (!$self->getXmlDisplay()) {
                 $self->setXmlDisplay(1);
+                $self->setHeaderSetting(1);    #xml display requires column headings.
                 $howsay = "is now";
             }
         } elsif ($buf =~ /^off/i) {
@@ -2071,7 +2228,8 @@ sub setCommand
         printf STDOUT "HEADER output %s %s\n",
             $howsay, $self->getHeaderSetting()? "ON" : "OFF" unless($QUIET);
     } else {
-        printf STDERR "%s: ERROR: set '%s' not recognized - ignored.\n", $pkgname, $buf;
+        #not an internal set - maybe it is sql:
+        return 0;
     }
 
     return 1;    #we found and processed a set command
@@ -2364,7 +2522,7 @@ sub getTableAttributes
     #foreach result set ...
     my @allrows = ();
     while ($rseta->next()) {
-        push @allrows, [getRow($rseta, 0, columnExcludeMap($rseta, @excludenames))] ;
+        push @allrows, getRow($rseta, 0, columnExcludeMap($rseta, @excludenames));
     }
 
     my @tableColumnDescriptions = ();
@@ -2386,10 +2544,10 @@ sub showSchemaCommand
 
     my $dbMetaData = $self->getMetaData();
 
-    if (!$self->getIsMysql()) {
-        printf STDERR "sorry, schema command is only implemented for mysql.\n";
-        return 1;
-    }
+#   if (!$self->getIsMysql()) {
+#       printf STDERR "sorry, schema command is only implemented for mysql.\n";
+#       return 1;
+#   }
 
     my $rseta = undef;
     my $rsetb = undef;
@@ -2437,7 +2595,7 @@ sub showSchemaCommand
     #$self->displayResultSet($rseta, &columnExcludeMap($rseta, @excludenames));
     my @allrows = ();
     while ($rseta->next()) {
-        push @allrows, [getRow($rseta, 0, columnExcludeMap($rseta, @excludenames))] ;
+        push @allrows, getRow($rseta, 0, columnExcludeMap($rseta, @excludenames));
     }
 
     my @tables = ();
@@ -2509,9 +2667,10 @@ sub showTablesCommand
 
     #show the tables from the named database:
     eval {
-        my @list = ("TABLE","SYSTEM TABLE","VIEW");
-        @list = ("TABLE");
-        $rseta = $dbMetaData->getTables(undef, undef, "%", [@list]);
+        $rseta = $dbMetaData->getTables(undef, undef, "%", undef);
+        #my @list = ("TABLE","SYSTEM TABLE","VIEW");
+        #@list = ("TABLE");
+        #$rseta = $dbMetaData->getTables(undef, undef, "%", [@list]);
         #$rseta = $dbMetaData->getTables(undef, undef, "%", ["TABLE","SYSTEM TABLE","VIEW"]);
         #$rseta = $dbMetaData->getTables(undef, undef, "%", ["TABLE"]);
         #$rseta = $dbMetaData->getTables($dbname, "%", "%", []);
@@ -2899,21 +3058,6 @@ sub setHeaderSetting
     return $self->{'mHeaderSetting'};
 }
 
-sub getExecCommandString
-#return value of ExecCommandString
-{
-    my ($self) = @_;
-    return $self->{'mExecCommandString'};
-}
-
-sub setExecCommandString
-#set value of ExecCommandString and return value.
-{
-    my ($self, $value) = @_;
-    $self->{'mExecCommandString'} = $value;
-    return $self->{'mExecCommandString'};
-}
-
 sub getPrompt
 #return value of Prompt
 {
@@ -2957,6 +3101,13 @@ sub password
     return $self->{'mPassword'};
 }
 
+sub progName
+#return value of mProgName
+{
+    my ($self) = @_;
+    return $self->{'mProgName'};
+}
+
 sub pathSeparator
 #return value of mPathSeparator
 {
@@ -2976,6 +3127,13 @@ sub metaFuncs
 {
     my ($self) = @_;
     return $self->{'mMetaFuncs'};
+}
+
+sub suppressOutput
+#return value of mSuppressOutput
+{
+    my ($self) = @_;
+    return $self->{'mSuppressOutput'};
 }
 
 #######
@@ -3052,6 +3210,7 @@ sub getColumns
     return () unless defined($rset);
 
     my (@header) = ();
+
 #printf STDERR "getColumns:  #colmap=%d colmap=(%s)\n", $#colmap, join(",", @colmap);
 
     eval {
@@ -3178,20 +3337,32 @@ sub getRow
         my $m        = $rset->getMetaData();
         my $colcnt   = $m->getColumnCount();
 #printf STDERR "getRow:  colcnt=%d\n", $colcnt;
-        for (my $ii = 1; $ii <= $colcnt; $ii++) {
-            next unless ($colmap[$ii-1]);   #skip if column is not selected
 
-            #note - you have to do the fetch first, which sets wasNull() for the current column.
-            my $str = $rset->getString($ii);
-#printf STDERR "\tgetRow:  str='%s'\n", $str;
+        my $str = undef;
+        if ($xmldisplay) {
+            for (my $ii = 1; $ii <= $colcnt; $ii++) {
+                next unless ($colmap[$ii-1]);   #skip if column is not selected
 
-            #if we are displaying xml rowsets...
-            if ($xmldisplay) {
-                #...then set SQL NULL elements to undef:
-                push @data, ($rset->wasNull() ? undef : $str);
-            } else {
-                #otherwise, we will display the string "(NULL)":
-                push @data, ($rset->wasNull() ? "(NULL)" : $str);
+                #note - you have to do the fetch first, which sets wasNull() for the current column.
+                $str = $rset->getString($ii);
+                #printf STDERR "\tgetRow:  str='%s'\n", $str if ($DEBUG);
+
+                #we are displaying xml rowsets - set SQL NULL elements to undef:
+                #push @data, ($rset->wasNull() ? undef : $str);
+                push @data, $str;
+            }
+        } else {
+            for (my $ii = 1; $ii <= $colcnt; $ii++) {
+                next unless ($colmap[$ii-1]);   #skip if column is not selected
+
+                #note - you have to do the fetch first, which sets wasNull() for the current column.
+                $str = $rset->getString($ii);
+
+                #printf STDERR "\tgetRow:  str='%s'\n", $str if ($DEBUG);
+
+                #not displaying xml rowsets - display the string "(NULL)":
+                #push @data, ($rset->wasNull() ? "(NULL)" : $str);
+                push @data, (defined($str) ?  $str : "(NULL)");
             }
         }
     };
@@ -3214,7 +3385,7 @@ sub getRow
         return ();  #empty list
     }
 
-    return @data;
+    return \@data;
 }
 
 sub setMaxColumnSizes
@@ -3231,7 +3402,7 @@ sub setMaxColumnSizes
     }
 
     for (my $ii = 0; $ii <= $#data; $ii++) {
-        $sizes[$ii] = &maxwidth( $sizes[$ii], length(sprintf("%s", $data[$ii])) );
+        $sizes[$ii] = &maxwidth( $sizes[$ii], length(sprintf("%s", (defined($data[$ii]) ? $data[$ii] : "(NULL)"))) );
     }
 
     @{$szref} = @sizes;
@@ -3336,14 +3507,13 @@ sub main
         return 1;
     }
 
-    if ( $psqlImpl->getExecCommandString() ) {
+    if ( $scfg->getExecCommandString() ) {
         #...if we have an immediate command to execute, then do it and exit:
         if (!$psqlImpl->sql_init_connection()) {
             printf STDERR "%s:[sqlsession]:  cannot get a database connection:  ABORT\n", $pkgname;
             return 1;
         } else {
-
-            my $lbuf = $psqlImpl->getExecCommandString();
+            my $lbuf = $scfg->getExecCommandString();
 
             if ($psqlImpl->localCommand($lbuf)) {
                 #return zero status if execute is successful
@@ -3481,6 +3651,7 @@ OPTIONS
   -e string         Execute commands from "string" and exit.  Useful for timing commands.
   -prompt string    Use <string> as prompt instead of default.
   -noprompt         Shorthand for -prompt ""
+  -nooutput         Supress output of query results (for testing query times).
 
 ENVIRONMENT
  CLASSPATH      Java CLASSPATH, inherited by JDBC.pm
@@ -3585,6 +3756,9 @@ sub parse_args
                 printf STDERR "%s:  -url requires the JDBC connection url\n", $p;
                 return 1;
             }
+        } elsif ($flag =~ '^-nooutput') {
+            # supress output of query results (for testing query times)
+            $scfg->setSuppressOutput(1);
         } elsif ($flag =~ '^-noprompt') {
             # clear prompt, same as "-prompt ''"
             $scfg->setUserSuppliedPrompt('');

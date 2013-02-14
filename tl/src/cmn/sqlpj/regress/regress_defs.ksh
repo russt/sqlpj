@@ -9,7 +9,7 @@ REGRESS_SRCROOT="$SQLPJ_SRCROOT/regress"
 #this is where we write test output:
 TEST_ROOT=$SQLPJ_SRCROOT/bld/tst
 
-SQLPJ_CGROOT="$SQLPJ_SRCROOT/srcgen/bld"
+SQLPJ_CGROOT="$SQLPJ_SRCROOT/srcgen/cgsrc/bld"
 if [ ! -d $SQLPJ_SRCROOT ]; then
     2>&1 echo WARNING:  you must generate sqlpj in $SQLPJ_CGROOT to test latest source
     #fall back to latest installed version:
