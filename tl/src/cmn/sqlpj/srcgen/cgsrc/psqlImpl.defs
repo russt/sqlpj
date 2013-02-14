@@ -335,7 +335,7 @@ sub fastDisplayResultSet
 
     my $tableName = &getTableName($rset);
 
-    printf "getHeaderSetting=%d\n", $self->getHeaderSetting() if ($DEBUG);
+    printf STDERR "getHeaderSetting=%d\n", $self->getHeaderSetting() if ($DEBUG);
 
     #we need headers to tag xml elements - make sure they are turned on:
     $self->setHeaderSetting(1) if ($self->getXmlDisplay());
@@ -631,7 +631,7 @@ sub sql_init_connection
         return 0;
     }
 
-    printf "isOracle=%d isMySql=%d isDerby=%d isFirebird=%d\n", $self->getIsOracle(), $self->getIsMysql(), $self->getIsDerby(), $self->getIsFirebird() if ($DEBUG);
+    printf STDERR "isOracle=%d isMySql=%d isDerby=%d isFirebird=%d\n", $self->getIsOracle(), $self->getIsMysql(), $self->getIsDerby(), $self->getIsFirebird() if ($DEBUG);
 
     #init or re-init our tables object:
     $self->setSqlTables( new {=SQLTABLES_PACKAGE=}($self->getMetaData(), $self->getDatabaseName()) );
