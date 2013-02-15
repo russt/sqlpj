@@ -70,16 +70,15 @@ PL_PACKAGE_DESCRIPTION = Main driver for sqlpj - a command-line SQL interpreter 
 PL_EXTERN_PKG_IMPORTS = << [
 use Config;
 ]
-#missing a newline due to pragma setting:
-%void $PL_EXTERN_PKG_IMPORTS:nl:a
 
 PL_PKG_IMPORTS = << [
 use $_PKGCONFIG_PACKAGE;
 use $_PSQLIMPL_PACKAGE;
 ]
 
-%if    $GEN_ONE_MODULE   PL_PKG_IMPORTS = $PL_EXTERN_PKG_IMPORTS
-%ifnot $GEN_ONE_MODULE   PL_PKG_IMPORTS = $PL_EXTERN_PKG_IMPORTS$PL_PKG_IMPORTS
+#note - missing a newline due to pragma setting:
+%if    $GEN_ONE_MODULE   PL_PKG_IMPORTS = ${PL_EXTERN_PKG_IMPORTS:rnewline}
+%ifnot $GEN_ONE_MODULE   PL_PKG_IMPORTS = ${PL_EXTERN_PKG_IMPORTS:rnewline}$PL_PKG_IMPORTS
 }
 
 PL_PKG_ATTRIBUTES := << EOF
