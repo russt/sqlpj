@@ -34,7 +34,7 @@
 
 use strict;
 
-package sqlindex;
+package sqlpj::sqlindex;
 my $pkgname = __PACKAGE__;
 
 #imports:
@@ -160,7 +160,7 @@ sub keyNames
 }
 
 1;
-} #end of sqlindex
+} #end of sqlpj::sqlindex
 {
 #
 #sqlindexkey - A single key attribute associated with an SQL index
@@ -168,7 +168,7 @@ sub keyNames
 
 use strict;
 
-package sqlindexkey;
+package sqlpj::sqlindexkey;
 my $pkgname = __PACKAGE__;
 
 #imports:
@@ -256,7 +256,7 @@ sub columnObj
 }
 
 1;
-} #end of sqlindexkey
+} #end of sqlpj::sqlindexkey
 {
 #
 #sqlcolumn - manage metadata for a single column of an sql table
@@ -264,7 +264,7 @@ sub columnObj
 
 use strict;
 
-package sqlcolumn;
+package sqlpj::sqlcolumn;
 my $pkgname = __PACKAGE__;
 
 #imports:
@@ -409,7 +409,7 @@ sub isAutoIncrement
 }
 
 1;
-} #end of sqlcolumn
+} #end of sqlpj::sqlcolumn
 {
 #
 #sqltable - manange metadata for a single sql table
@@ -417,7 +417,7 @@ sub isAutoIncrement
 
 use strict;
 
-package sqltable;
+package sqlpj::sqltable;
 my $pkgname = __PACKAGE__;
 
 #imports:
@@ -549,7 +549,7 @@ sub setTableAttributes
             #create new column object:
             #######
             $self->{'mColumnsByName'}->{$cname} =
-                new sqlcolumn(
+                new sqlpj::sqlcolumn(
                     $tblname, $cname, $ctype, $csize, $cnullable, $cdefault, $decimalDigits,
                     $autoIncrementColumns{$cname}
                 );
@@ -597,7 +597,7 @@ sub setTableAttributes
 
             if ($lastIndexName eq $indexName) {
 #printf "%s: CONTINUE OLD RECORD lastIndexName=%s indexName=%s cname=%s\n", $tblname, $lastIndexName, $indexName, $cname;
-                $keyobj = new sqlindexkey ($indexName, $cname, $self->columnsByName($cname));
+                $keyobj = new sqlpj::sqlindexkey ($indexName, $cname, $self->columnsByName($cname));
                 #push key on index:
                 $idxobj->addKey($keyobj);
             } else {
@@ -614,11 +614,11 @@ sub setTableAttributes
 
 #printf "%s: CREATE NEW RECORD lastIndexName=%s indexName=%s cname=%s isPrimary=%d isUnique=%d\n", $tblname, $lastIndexName, $indexName, $cname, $isPrimary, $isUnique;
 
-                $idxobj = new sqlindex ($tblname, $indexName, $isPrimary, $isUnique);
+                $idxobj = new sqlpj::sqlindex ($tblname, $indexName, $isPrimary, $isUnique);
                 #push index on table:
                 $self->addIndex($idxobj);
 
-                $keyobj = new sqlindexkey ($indexName, $cname, $self->columnsByName($cname));
+                $keyobj = new sqlpj::sqlindexkey ($indexName, $cname, $self->columnsByName($cname));
                 #push key on index:
                 $idxobj->addKey($keyobj);
             }
@@ -761,7 +761,7 @@ sub indexNames
 }
 
 1;
-} #end of sqltable
+} #end of sqlpj::sqltable
 {
 #
 #sqltables - manange sql table metadata
@@ -769,7 +769,7 @@ sub indexNames
 
 use strict;
 
-package sqltables;
+package sqlpj::sqltables;
 my $pkgname = __PACKAGE__;
 
 #imports:
@@ -801,7 +801,7 @@ sub new
 
     for my $tblname ($self->tableNames()) {
         #set tables information from jdbc metaData:
-        $self->{'mTablesByName'}->{$tblname} = new sqltable($self->metaData(), $self->databaseName(), $tblname);
+        $self->{'mTablesByName'}->{$tblname} = new sqlpj::sqltable($self->metaData(), $self->databaseName(), $tblname);
     }
 
     @{$self->{'mAllTables'}} = values %{$self->{'mTablesByName'}};
@@ -892,7 +892,7 @@ sub retrieveTableNames
 }
 
 1;
-} #end of sqltables
+} #end of sqlpj::sqltables
 {
 #
 #pkgconfig - Configuration parameters for sqlpj package
@@ -900,7 +900,7 @@ sub retrieveTableNames
 
 use strict;
 
-package pkgconfig;
+package sqlpj::pkgconfig;
 my $pkgname = __PACKAGE__;
 
 #imports:
@@ -1259,7 +1259,7 @@ sub versionDate
 }
 
 1;
-} #end of pkgconfig
+} #end of sqlpj::pkgconfig
 {
 #
 #sqlpjImpl - perl/jdbc sql command line interpreter
@@ -1267,7 +1267,7 @@ sub versionDate
 
 use strict;
 
-package sqlpjImpl;
+package sqlpj::sqlpjImpl;
 my $pkgname = __PACKAGE__;
 
 #imports:
@@ -1989,7 +1989,7 @@ sub sql_init_connection
     printf STDERR "isOracle=%d isMySql=%d isDerby=%d isFirebird=%d\n", $self->getIsOracle(), $self->getIsMysql(), $self->getIsDerby(), $self->getIsFirebird() if ($DEBUG);
 
     #init or re-init our tables object:
-    $self->setSqlTables( new sqltables($self->getMetaData(), $self->getDatabaseName()) );
+    $self->setSqlTables( new sqlpj::sqltables($self->getMetaData(), $self->getDatabaseName()) );
 
     return 1;    #success
 }
@@ -3445,7 +3445,7 @@ sub isSqlException
 
 
 1;
-} #end of sqlpjImpl
+} #end of sqlpj::sqlpjImpl
 {
 #
 #sqlpj - Main driver for sqlpj - a command-line SQL interpreter for JDBC.pm
@@ -3459,6 +3459,7 @@ my $pkgname = __PACKAGE__;
 #imports:
 use Config;
 
+
 #standard global options:
 my $p = $main::p;
 my ($VERBOSE, $HELPFLAG, $DEBUGFLAG, $DDEBUGFLAG, $QUIET) = (0,0,0,0,0);
@@ -3466,7 +3467,7 @@ my ($VERBOSE, $HELPFLAG, $DEBUGFLAG, $DDEBUGFLAG, $QUIET) = (0,0,0,0,0);
 #package global variables:
 my $USE_STDIN = 1;
 my @SQLFILES = ();
-my $scfg = new pkgconfig();
+my $scfg = new sqlpj::pkgconfig();
 #this allows signal to close/open connection:
 my $psqlImpl = undef;
 
@@ -3495,7 +3496,7 @@ sub main
     #######
     #create implementation class, passing in our configuration:
     #######
-    $psqlImpl = new sqlpjImpl($scfg);
+    $psqlImpl = new sqlpj::sqlpjImpl($scfg);
 
     #reset the prompt string if user supplied the option:
     $psqlImpl->setPrompt($psqlImpl->userSuppliedPrompt()) if (defined($psqlImpl->userSuppliedPrompt()));

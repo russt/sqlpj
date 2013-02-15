@@ -67,13 +67,17 @@ EOF
 PL_PACKAGE_DESCRIPTION = Main driver for sqlpj - a command-line SQL interpreter for JDBC.pm
 
 {
-PL_EXTERN_PKG_IMPORTS = << EOF
+PL_EXTERN_PKG_IMPORTS = << [
 use Config;
-EOF
-PL_PKG_IMPORTS = << EOF
-use $PKGCONFIG_PACKAGE;
-use $PSQLIMPL_PACKAGE;
-EOF
+]
+#missing a newline due to pragma setting:
+%void $PL_EXTERN_PKG_IMPORTS:nl:a
+
+PL_PKG_IMPORTS = << [
+use $_PKGCONFIG_PACKAGE;
+use $_PSQLIMPL_PACKAGE;
+]
+
 %if    $GEN_ONE_MODULE   PL_PKG_IMPORTS = $PL_EXTERN_PKG_IMPORTS
 %ifnot $GEN_ONE_MODULE   PL_PKG_IMPORTS = $PL_EXTERN_PKG_IMPORTS$PL_PKG_IMPORTS
 }
@@ -81,7 +85,7 @@ EOF
 PL_PKG_ATTRIBUTES := << EOF
 my $USE_STDIN = 1;
 my @SQLFILES = ();
-my $scfg = new {=PKGCONFIG_PACKAGE=}();
+my $scfg = new {=_PKGCONFIG_PACKAGE=}();
 #this allows signal to close/open connection:
 my $psqlImpl = undef;
 EOF
@@ -102,7 +106,7 @@ $SIG{'TRAP'} = '{=PL_PACKAGE=}::rec_signal';
 #######
 #create implementation class, passing in our configuration:
 #######
-$psqlImpl = new {=PSQLIMPL_PACKAGE=}($scfg);
+$psqlImpl = new {=_PSQLIMPL_PACKAGE=}($scfg);
 
 #reset the prompt string if user supplied the option:
 $psqlImpl->setPrompt($psqlImpl->userSuppliedPrompt()) if (defined($psqlImpl->userSuppliedPrompt()));

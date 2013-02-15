@@ -16,9 +16,9 @@ PL_CONSTRUCTOR_NAME = new
 PL_EXTERN_PKG_IMPORTS = << EOF
 EOF
 PL_PKG_IMPORTS = << EOF
-use $SQLCOLUMN_PACKAGE;
-use $SQLINDEX_PACKAGE;
-use $SQLINDEXKEY_PACKAGE;
+use $_SQLCOLUMN_PACKAGE;
+use $_SQLINDEX_PACKAGE;
+use $_SQLINDEXKEY_PACKAGE;
 EOF
 %if    $GEN_ONE_MODULE   PL_PKG_IMPORTS = $PL_EXTERN_PKG_IMPORTS
 %ifnot $GEN_ONE_MODULE   PL_PKG_IMPORTS = $PL_EXTERN_PKG_IMPORTS$PL_PKG_IMPORTS
@@ -178,7 +178,7 @@ sub setTableAttributes
             #create new column object:
             #######
             $self->{'mColumnsByName'}->{$cname} =
-                new {=SQLCOLUMN_PACKAGE=}(
+                new {=_SQLCOLUMN_PACKAGE=}(
                     $tblname, $cname, $ctype, $csize, $cnullable, $cdefault, $decimalDigits,
                     $autoIncrementColumns{$cname}
                 );
@@ -226,7 +226,7 @@ sub setTableAttributes
 
             if ($lastIndexName eq $indexName) {
 #printf "%s: CONTINUE OLD RECORD lastIndexName=%s indexName=%s cname=%s\n", $tblname, $lastIndexName, $indexName, $cname;
-                $keyobj = new {=SQLINDEXKEY_PACKAGE=} ($indexName, $cname, $self->columnsByName($cname));
+                $keyobj = new {=_SQLINDEXKEY_PACKAGE=} ($indexName, $cname, $self->columnsByName($cname));
                 #push key on index:
                 $idxobj->addKey($keyobj);
             } else {
@@ -243,11 +243,11 @@ sub setTableAttributes
 
 #printf "%s: CREATE NEW RECORD lastIndexName=%s indexName=%s cname=%s isPrimary=%d isUnique=%d\n", $tblname, $lastIndexName, $indexName, $cname, $isPrimary, $isUnique;
 
-                $idxobj = new {=SQLINDEX_PACKAGE=} ($tblname, $indexName, $isPrimary, $isUnique);
+                $idxobj = new {=_SQLINDEX_PACKAGE=} ($tblname, $indexName, $isPrimary, $isUnique);
                 #push index on table:
                 $self->addIndex($idxobj);
 
-                $keyobj = new {=SQLINDEXKEY_PACKAGE=} ($indexName, $cname, $self->columnsByName($cname));
+                $keyobj = new {=_SQLINDEXKEY_PACKAGE=} ($indexName, $cname, $self->columnsByName($cname));
                 #push key on index:
                 $idxobj->addKey($keyobj);
             }

@@ -16,8 +16,8 @@ PL_CONSTRUCTOR_NAME = new
 PL_EXTERN_PKG_IMPORTS = << EOF
 EOF
 PL_PKG_IMPORTS = << EOF
-use $SQLTABLES_PACKAGE;
-use $SQLTABLE_PACKAGE;
+use $_SQLTABLES_PACKAGE;
+use $_SQLTABLE_PACKAGE;
 EOF
 %if    $GEN_ONE_MODULE   PL_PKG_IMPORTS = $PL_EXTERN_PKG_IMPORTS
 %ifnot $GEN_ONE_MODULE   PL_PKG_IMPORTS = $PL_EXTERN_PKG_IMPORTS$PL_PKG_IMPORTS
@@ -634,7 +634,7 @@ sub sql_init_connection
     printf STDERR "isOracle=%d isMySql=%d isDerby=%d isFirebird=%d\n", $self->getIsOracle(), $self->getIsMysql(), $self->getIsDerby(), $self->getIsFirebird() if ($DEBUG);
 
     #init or re-init our tables object:
-    $self->setSqlTables( new {=SQLTABLES_PACKAGE=}($self->getMetaData(), $self->getDatabaseName()) );
+    $self->setSqlTables( new {=_SQLTABLES_PACKAGE=}($self->getMetaData(), $self->getDatabaseName()) );
 
     return 1;    #success
 }

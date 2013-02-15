@@ -1,6 +1,8 @@
 #return if already included:
 %ifdef BUILD_SETUP_COMPLETE %return
 
+%pragma version 1.98
+
 ###########
 # note - version is initialized in pkgconfig.defs
 # TODO:  initialize these from:  cvs log -h psqlImpl.defs
@@ -35,28 +37,39 @@ JDBC_CLASSLIB = $TOOLROOT/java/ant/lib
 %ifnot $JDBC_CLASSLIB:d  %eecho JDBC_CLASSLIB must be a directory - ABORT
 %ifnot $JDBC_CLASSLIB:d  %halt 2
 
+#convention:  _<package> is "full perl path" for package.
 SQLPJ_PACKAGE      = sqlpj
+_SQLPJ_PACKAGE      = sqlpj
 
 #set the name of final module if we are generating:
 %ifndef GEN_ONE_MODULE	GEN_ONE_MODULE=1
 %if $GEN_ONE_MODULE	ONE_MODULE = $SQLPJ_PACKAGE.pl
 
 PSQLIMPL_PACKAGE   = sqlpjImpl
+_PSQLIMPL_PACKAGE   = ${SQLPJ_PACKAGE}::${PSQLIMPL_PACKAGE}
 
 #configuration parameters:
 PKGCONFIG_PACKAGE = pkgconfig
+_PKGCONFIG_PACKAGE = ${SQLPJ_PACKAGE}::${PKGCONFIG_PACKAGE}
 
 #metadata for collection of sql tables:
 SQLTABLES_PACKAGE  = sqltables
+_SQLTABLES_PACKAGE = ${SQLPJ_PACKAGE}::${SQLTABLES_PACKAGE}
+
 #metadata for a single sql table:
 SQLTABLE_PACKAGE   = sqltable
+_SQLTABLE_PACKAGE  = ${SQLPJ_PACKAGE}::${SQLTABLE_PACKAGE}
+
 #metadata for a single column belonging to an sql table:
 SQLCOLUMN_PACKAGE = sqlcolumn
+_SQLCOLUMN_PACKAGE= ${SQLPJ_PACKAGE}::${SQLCOLUMN_PACKAGE}
 
 #an SQL index associated with a table
-SQLINDEX_PACKAGE = sqlindex
+SQLINDEX_PACKAGE  = sqlindex
+_SQLINDEX_PACKAGE = ${SQLPJ_PACKAGE}::${SQLINDEX_PACKAGE}
 #a key attribute associated with an SQL index
-SQLINDEXKEY_PACKAGE = sqlindexkey
+SQLINDEXKEY_PACKAGE  = sqlindexkey
+_SQLINDEXKEY_PACKAGE = ${SQLPJ_PACKAGE}::${SQLINDEXKEY_PACKAGE}
 
 #set default constuctor name:
 PL_CONSTRUCTOR_NAME = new
@@ -84,24 +97,31 @@ sub dumpThisObject
 
 EOF
 
+#:pl2path            - convert perl package reference to .pl pathname, e.g. Foo::Bar::Impl -> Foo/Bar/Impl.pl
+#:pm2path            - convert perl package reference to .pm pathname, e.g. Foo::Bar::Impl -> Foo/Bar/Impl.pm
+#:prlpkg2path        - convert perl parent package reference to path, e.g. Foo::Bar -> Foo/Bar
+#:path2pm            - convert perl pathname to perl module or package name, e.g.:
+
 generate_a_module := << EOF
 #macro to generate a single module and append to single module
 {
 #%echo generate_a_module module_defs=$module_defs PL_PACKAGE=$PL_PACKAGE GEN_ONE_MODULE=$GEN_ONE_MODULE
     %ifndef  perl_template       perl_template = perl/prlobj.ptpl
-    %ifndef  perl_outputfn       perl_outputfn = $PL_PACKAGE.pm
+    %ifndef  perl_outputfn       perl_outputfn = $_PL_PACKAGE:pm2path
 
+    %ifndef   PL_PACKAGE_PREFIX    PL_PACKAGE_PREFIX = ${SQLPJ_PACKAGE}::
     %include  $module_defs
     %if       $GEN_ONE_MODULE    $perl_template >>    /$ONE_MODULE
     %include  perl/reset_template_vars.ptpl
 
     %include  $module_defs
-    %ifnot    $GEN_ONE_MODULE    $perl_template       /$perl_outputfn
+    %ifnot    $GEN_ONE_MODULE    $perl_template       lib/$perl_outputfn
     %include  perl/reset_template_vars.ptpl
 
     %undef  module_defs
     %undef  perl_template
     %undef  perl_outputfn
+    %undef  PL_PACKAGE_PREFIX
 }
 EOF
 

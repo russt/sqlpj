@@ -10,10 +10,14 @@ REGRESS_SRCROOT="$SQLPJ_SRCROOT/regress"
 TEST_ROOT=$SQLPJ_SRCROOT/bld/tst
 
 SQLPJ_CGROOT="$SQLPJ_SRCROOT/srcgen/cgsrc/bld"
-if [ ! -d $SQLPJ_SRCROOT ]; then
-    2>&1 echo WARNING:  you must generate sqlpj in $SQLPJ_CGROOT to test latest source
+if [ ! -d $SQLPJ_CGROOT ]; then
+    1>&2 echo WARNING:  you must generate sqlpj in $SQLPJ_CGROOT to test latest source
     #fall back to latest installed version:
     SQLPJ_CGROOT="$SQLPJ_SRCROOT"
+    PERL_LIBPATH="${SQLPJ_CGROOT};$PERL_LIBPATH"
+else
+    #the cado bld area lib root is generated to bld/lib
+    PERL_LIBPATH="${SQLPJ_CGROOT}/lib;$PERL_LIBPATH"
 fi
 
 #this database will be created as part of test suite:
@@ -21,7 +25,6 @@ REGRESS_TESTDB=sqltestdb
 
 export PATH PERL_LIBPATH
 PATH="${SQLPJ_CGROOT}${PS}$PATH"
-PERL_LIBPATH="${SQLPJ_CGROOT};$PERL_LIBPATH"
 
 ###########
 #connection property files:

@@ -15,7 +15,7 @@ PL_CONSTRUCTOR_NAME = new
 {
 PL_EXTERN_PKG_IMPORTS =
 PL_PKG_IMPORTS = << EOF
-use $SQLTABLE_PACKAGE;
+use $_SQLTABLE_PACKAGE;
 EOF
 %if    $GEN_ONE_MODULE   PL_PKG_IMPORTS = $PL_EXTERN_PKG_IMPORTS
 %ifnot $GEN_ONE_MODULE   PL_PKG_IMPORTS = $PL_EXTERN_PKG_IMPORTS$PL_PKG_IMPORTS
@@ -48,7 +48,7 @@ PL_POST_ATTRIBUTE_INIT := << EOF
 
 for my $tblname ($self->tableNames()) {
     #set tables information from jdbc metaData:
-    $self->{'mTablesByName'}->{$tblname} = new {=SQLTABLE_PACKAGE=}($self->metaData(), $self->databaseName(), $tblname);
+    $self->{'mTablesByName'}->{$tblname} = new {=_SQLTABLE_PACKAGE=}($self->metaData(), $self->databaseName(), $tblname);
 }
 
 @{$self->{'mAllTables'}} = values %{$self->{'mTablesByName'}};
