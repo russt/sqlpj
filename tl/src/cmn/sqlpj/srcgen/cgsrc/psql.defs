@@ -95,12 +95,12 @@ EOF
 PL_MAIN := << //
 
 #we handle our own signals:
-$SIG{'INT'}  = '{=PL_PACKAGE=}::rec_signal';
-$SIG{'KILL'} = '{=PL_PACKAGE=}::rec_signal';
-$SIG{'QUIT'} = '{=PL_PACKAGE=}::rec_signal';
-$SIG{'TERM'} = '{=PL_PACKAGE=}::rec_signal';
-$SIG{'HUP'}  = '{=PL_PACKAGE=}::rec_signal';
-$SIG{'TRAP'} = '{=PL_PACKAGE=}::rec_signal';
+$SIG{'INT'}  = '{=_PL_PACKAGE=}::rec_signal';
+$SIG{'KILL'} = '{=_PL_PACKAGE=}::rec_signal';
+$SIG{'QUIT'} = '{=_PL_PACKAGE=}::rec_signal';
+$SIG{'TERM'} = '{=_PL_PACKAGE=}::rec_signal';
+$SIG{'HUP'}  = '{=_PL_PACKAGE=}::rec_signal';
+$SIG{'TRAP'} = '{=_PL_PACKAGE=}::rec_signal';
 
 #######
 #create implementation class, passing in our configuration:

@@ -39,7 +39,8 @@ JDBC_CLASSLIB = $TOOLROOT/java/ant/lib
 
 #convention:  _<package> is "full perl path" for package.
 SQLPJ_PACKAGE      = sqlpj
-_SQLPJ_PACKAGE      = sqlpj
+_SQLPJ_PACKAGE     = sqlpj
+DEFAULT_PACKAGE    = $_SQLPJ_PACKAGE
 
 #set the name of final module if we are generating:
 %ifndef GEN_ONE_MODULE	GEN_ONE_MODULE=1
@@ -109,7 +110,7 @@ generate_a_module := << EOF
     %ifndef  perl_template       perl_template = perl/prlobj.ptpl
     %ifndef  perl_outputfn       perl_outputfn = $_PL_PACKAGE:pm2path
 
-    %ifndef   PL_PACKAGE_PREFIX    PL_PACKAGE_PREFIX = ${SQLPJ_PACKAGE}::
+    %ifndef   PL_PACKAGE_PREFIX    PL_PACKAGE_PREFIX = ${DEFAULT_PACKAGE}::
     %include  $module_defs
     %if       $GEN_ONE_MODULE    $perl_template >>    /$ONE_MODULE
     %include  perl/reset_template_vars.ptpl
