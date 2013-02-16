@@ -926,8 +926,8 @@ sub new
         'mJdbcUser' => undef,
         'mJdbcPassword' => undef,
         'mJdbcPropsFileName' => undef,
-        'mVersionNumber' => "1.34",
-        'mVersionDate'   => "14-Feb-2013",
+        'mVersionNumber' => "1.35",
+        'mVersionDate'   => "16-Feb-2013",
         'mPathSeparator' => undef,
         'mDebug'         => 0,
         'mDDebug'        => 0,
@@ -1018,6 +1018,49 @@ sub parseJdbcPropertiesFile
 
     return 0;    #SUCCESS
 }
+
+sub checkSetClasspath
+#if we have a classpath setting, then add to the environemnt.
+#
+#NOTE:  inline java will ignore any new CLASSPATH setting after
+#       the module is loaded.  A work-around is to use "require" to load it.
+{
+    my ($self) = @_;
+
+#printf STDERR "BEFORE CLASSPATH='%s'\n", $ENV{'CLASSPATH'};
+    if (defined($self->getJdbcClassPath())) {
+        if (defined($ENV{'CLASSPATH'}) && $ENV{'CLASSPATH'} ne "") {
+            $ENV{'CLASSPATH'} = sprintf("%s%s%s", $self->getJdbcClassPath(), $self->getPathSeparator(), $ENV{'CLASSPATH'});
+        } else {
+            $ENV{'CLASSPATH'} = $self->getJdbcClassPath();
+        }
+    }
+#printf STDERR "AFTER CLASSPATH='%s'\n", $ENV{'CLASSPATH'};
+}
+
+sub checkJdbcSettings
+#return true(1) if jdbc properties are all defined.
+{
+    my ($self) = @_;
+    my $errs = 0;
+    my $p = $self->getProgName();
+
+    if (!defined($self->getJdbcDriverClass())) {
+        ++$errs; printf STDERR "%s:  missing JDBC driver class\n", $p;
+    }
+    if (!defined($self->getJdbcUrl())) {
+        ++$errs; printf STDERR "%s:  missing JDBC URL\n", $p
+    }
+    if (!defined($self->getJdbcUser())) {
+        ++$errs; printf STDERR "%s:  missing JDBC User name\n", $p;
+    }
+    if (!defined($self->getJdbcPassword())) {
+        ++$errs; printf STDERR "%s:  missing JDBC User password\n", $p;
+    }
+
+    return($errs == 0);
+}
+
 
 sub getProgName
 #return value of ProgName
@@ -1913,7 +1956,7 @@ require Inline::Java;
             }
         } else {
             #not a java exception:
-            printf STDERR "%s[sql_exec]: eval FAILED:  %s\n", __PACKAGE__, $@;
+            printf STDERR "%s[check_driver]: eval FAILED:  %s\n", __PACKAGE__, $@;
         }
         return 0;
     }
@@ -2507,14 +2550,14 @@ sub getTableAttributes
             (my $xcptnName = $xcptn->toString()) =~ s/:.*//;
 
             if ( isSqlException($xcptnName) ) {
-                printf STDERR "%s[showTableCommand]: '%s'\n", __PACKAGE__, $xcptn->getMessage();
+                printf STDERR "%s[getTableAttributes]: '%s'\n", __PACKAGE__, $xcptn->getMessage();
             } else {
-                printf STDERR "%s[showTableCommand]: ", __PACKAGE__;
+                printf STDERR "%s[getTableAttributes]: ", __PACKAGE__;
                 $xcptn->printStackTrace();
             }
         } else {
             #not a java exception:
-            printf STDERR "%s[showTableCommand]: eval FAILED:  %s\n", __PACKAGE__, $@;
+            printf STDERR "%s[getTableAttributes]: eval FAILED:  %s\n", __PACKAGE__, $@;
         }
         return 1;  #we handled the command, even if we did get an exception
     }
@@ -2579,14 +2622,14 @@ sub showSchemaCommand
             (my $xcptnName = $xcptn->toString()) =~ s/:.*//;
 
             if ( isSqlException($xcptnName) ) {
-                printf STDERR "%s[showTablesCommand]: '%s'\n", __PACKAGE__, $xcptn->getMessage();
+                printf STDERR "%s[showSchemaCommand]: '%s'\n", __PACKAGE__, $xcptn->getMessage();
             } else {
-                printf STDERR "%s[showTablesCommand]: ", __PACKAGE__;
+                printf STDERR "%s[showSchemaCommand]: ", __PACKAGE__;
                 $xcptn->printStackTrace();
             }
         } else {
             #not a java exception:
-            printf STDERR "%s[showTablesCommand]: eval FAILED:  %s\n", __PACKAGE__, $@;
+            printf STDERR "%s[showSchemaCommand]: eval FAILED:  %s\n", __PACKAGE__, $@;
         }
         return 1;  #we handled the command, even if we did get an exception
     }
@@ -3192,7 +3235,7 @@ sub columnExcludeMap
             }
         } else {
             #not a java exception:
-            printf STDERR "%s[showTableCommand]: eval FAILED:  %s\n", __PACKAGE__, $@;
+            printf STDERR "%s[columnExcludeMap]: eval FAILED:  %s\n", __PACKAGE__, $@;
         }
         return ();  #empty list
     }
@@ -3544,47 +3587,6 @@ sub main
 
 ################################### PACKAGE ####################################
 
-sub checkSetClasspath
-#if we have a classpath setting, then add to the environemnt.
-#
-#NOTE:  inline java will ignore any new CLASSPATH setting after
-#       the module is loaded.  A work-around is to use "require" to load it.
-{
-    my ($cfg) = @_;
-
-#printf STDERR "BEFORE CLASSPATH='%s'\n", $ENV{'CLASSPATH'};
-    if (defined($cfg->getJdbcClassPath())) {
-        if (defined($ENV{'CLASSPATH'}) && $ENV{'CLASSPATH'} ne "") {
-            $ENV{'CLASSPATH'} = sprintf("%s%s%s", $cfg->getJdbcClassPath(), $cfg->getPathSeparator(), $ENV{'CLASSPATH'});
-        } else {
-            $ENV{'CLASSPATH'} = $cfg->getJdbcClassPath();
-        }
-    }
-#printf STDERR "AFTER CLASSPATH='%s'\n", $ENV{'CLASSPATH'};
-}
-
-sub checkJdbcSettings
-#return true(1) if jdbc properties are all defined.
-{
-    my ($cfg) = @_;
-    my $errs = 0;
-
-    if (!defined($cfg->getJdbcDriverClass())) {
-        ++$errs; printf STDERR "%s:  missing JDBC driver class\n", $p;
-    }
-    if (!defined($cfg->getJdbcUrl())) {
-        ++$errs; printf STDERR "%s:  missing JDBC URL\n", $p
-    }
-    if (!defined($cfg->getJdbcUser())) {
-        ++$errs; printf STDERR "%s:  missing JDBC User name\n", $p;
-    }
-    if (!defined($cfg->getJdbcPassword())) {
-        ++$errs; printf STDERR "%s:  missing JDBC User password\n", $p;
-    }
-
-    return($errs == 0);
-}
-
 sub rec_signal
 # we only want to abort sqlexec in progress, not program.
 {
@@ -3794,13 +3796,13 @@ sub parse_args
     $scfg->setVerbose($VERBOSE);
 
     #check the JDBC configuration:
-    if (!&checkJdbcSettings($scfg)) {
+    if (!$scfg->checkJdbcSettings()) {
         printf STDERR "%s:  one or more JDBC connection settings are missing or incomplete - ABORT.\n", $p;
         return 1;
     }
 
     #add to the CLASSPATH if required:
-    &checkSetClasspath($scfg);
+    $scfg->checkSetClasspath();
 
     #do we have file args?
     #take remaining args as directories to walk:

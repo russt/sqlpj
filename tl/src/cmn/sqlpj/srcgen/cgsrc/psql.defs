@@ -153,47 +153,6 @@ if ( $scfg->getExecCommandString() ) {
 
 { #subroutines
 PL_PKG_METHODS := << //
-sub checkSetClasspath
-#if we have a classpath setting, then add to the environemnt.
-#
-#NOTE:  inline java will ignore any new CLASSPATH setting after
-#       the module is loaded.  A work-around is to use "require" to load it.
-{
-    my ($cfg) = @_;
-
-#printf STDERR "BEFORE CLASSPATH='%s'\n", $ENV{'CLASSPATH'};
-    if (defined($cfg->getJdbcClassPath())) {
-        if (defined($ENV{'CLASSPATH'}) && $ENV{'CLASSPATH'} ne "") {
-            $ENV{'CLASSPATH'} = sprintf("%s%s%s", $cfg->getJdbcClassPath(), $cfg->getPathSeparator(), $ENV{'CLASSPATH'});
-        } else {
-            $ENV{'CLASSPATH'} = $cfg->getJdbcClassPath();
-        }
-    }
-#printf STDERR "AFTER CLASSPATH='%s'\n", $ENV{'CLASSPATH'};
-}
-
-sub checkJdbcSettings
-#return true(1) if jdbc properties are all defined.
-{
-    my ($cfg) = @_;
-    my $errs = 0;
-
-    if (!defined($cfg->getJdbcDriverClass())) {
-        ++$errs; printf STDERR "%s:  missing JDBC driver class\n", $p;
-    }
-    if (!defined($cfg->getJdbcUrl())) {
-        ++$errs; printf STDERR "%s:  missing JDBC URL\n", $p
-    }
-    if (!defined($cfg->getJdbcUser())) {
-        ++$errs; printf STDERR "%s:  missing JDBC User name\n", $p;
-    }
-    if (!defined($cfg->getJdbcPassword())) {
-        ++$errs; printf STDERR "%s:  missing JDBC User password\n", $p;
-    }
-
-    return($errs == 0);
-}
-
 sub rec_signal
 # we only want to abort sqlexec in progress, not program.
 {
@@ -323,13 +282,13 @@ $scfg->setQuiet($QUIET);
 $scfg->setVerbose($VERBOSE);
 
 #check the JDBC configuration:
-if (!&checkJdbcSettings($scfg)) {
+if (!$scfg->checkJdbcSettings()) {
     printf STDERR "%s:  one or more JDBC connection settings are missing or incomplete - ABORT.\n", $p;
     return 1;
 }
 
 #add to the CLASSPATH if required:
-&checkSetClasspath($scfg);
+$scfg->checkSetClasspath();
 
 #do we have file args?
 #take remaining args as directories to walk:

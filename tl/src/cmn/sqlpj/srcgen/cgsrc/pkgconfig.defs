@@ -173,6 +173,49 @@ sub parseJdbcPropertiesFile
     return 0;    #SUCCESS
 }
 
+sub checkSetClasspath
+#if we have a classpath setting, then add to the environemnt.
+#
+#NOTE:  inline java will ignore any new CLASSPATH setting after
+#       the module is loaded.  A work-around is to use "require" to load it.
+{
+    my ($self) = @_;
+
+#printf STDERR "BEFORE CLASSPATH='%s'\n", $ENV{'CLASSPATH'};
+    if (defined($self->getJdbcClassPath())) {
+        if (defined($ENV{'CLASSPATH'}) && $ENV{'CLASSPATH'} ne "") {
+            $ENV{'CLASSPATH'} = sprintf("%s%s%s", $self->getJdbcClassPath(), $self->getPathSeparator(), $ENV{'CLASSPATH'});
+        } else {
+            $ENV{'CLASSPATH'} = $self->getJdbcClassPath();
+        }
+    }
+#printf STDERR "AFTER CLASSPATH='%s'\n", $ENV{'CLASSPATH'};
+}
+
+sub checkJdbcSettings
+#return true(1) if jdbc properties are all defined.
+{
+    my ($self) = @_;
+    my $errs = 0;
+    my $p = $self->getProgName();
+
+    if (!defined($self->getJdbcDriverClass())) {
+        ++$errs; printf STDERR "%s:  missing JDBC driver class\n", $p;
+    }
+    if (!defined($self->getJdbcUrl())) {
+        ++$errs; printf STDERR "%s:  missing JDBC URL\n", $p
+    }
+    if (!defined($self->getJdbcUser())) {
+        ++$errs; printf STDERR "%s:  missing JDBC User name\n", $p;
+    }
+    if (!defined($self->getJdbcPassword())) {
+        ++$errs; printf STDERR "%s:  missing JDBC User password\n", $p;
+    }
+
+    return($errs == 0);
+}
+
+
 {=$getset_methods:rtrim=}
 EOF
 

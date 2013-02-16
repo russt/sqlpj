@@ -558,7 +558,7 @@ require Inline::Java;
             }
         } else {
             #not a java exception:
-            printf STDERR "%s[sql_exec]: eval FAILED:  %s\n", __PACKAGE__, $@;
+            printf STDERR "%s[check_driver]: eval FAILED:  %s\n", __PACKAGE__, $@;
         }
         return 0;
     }
@@ -1152,14 +1152,14 @@ sub getTableAttributes
             (my $xcptnName = $xcptn->toString()) =~ s/:.*//;
 
             if ( isSqlException($xcptnName) ) {
-                printf STDERR "%s[showTableCommand]: '%s'\n", __PACKAGE__, $xcptn->getMessage();
+                printf STDERR "%s[getTableAttributes]: '%s'\n", __PACKAGE__, $xcptn->getMessage();
             } else {
-                printf STDERR "%s[showTableCommand]: ", __PACKAGE__;
+                printf STDERR "%s[getTableAttributes]: ", __PACKAGE__;
                 $xcptn->printStackTrace();
             }
         } else {
             #not a java exception:
-            printf STDERR "%s[showTableCommand]: eval FAILED:  %s\n", __PACKAGE__, $@;
+            printf STDERR "%s[getTableAttributes]: eval FAILED:  %s\n", __PACKAGE__, $@;
         }
         return 1;  #we handled the command, even if we did get an exception
     }
@@ -1224,14 +1224,14 @@ sub showSchemaCommand
             (my $xcptnName = $xcptn->toString()) =~ s/:.*//;
 
             if ( isSqlException($xcptnName) ) {
-                printf STDERR "%s[showTablesCommand]: '%s'\n", __PACKAGE__, $xcptn->getMessage();
+                printf STDERR "%s[showSchemaCommand]: '%s'\n", __PACKAGE__, $xcptn->getMessage();
             } else {
-                printf STDERR "%s[showTablesCommand]: ", __PACKAGE__;
+                printf STDERR "%s[showSchemaCommand]: ", __PACKAGE__;
                 $xcptn->printStackTrace();
             }
         } else {
             #not a java exception:
-            printf STDERR "%s[showTablesCommand]: eval FAILED:  %s\n", __PACKAGE__, $@;
+            printf STDERR "%s[showSchemaCommand]: eval FAILED:  %s\n", __PACKAGE__, $@;
         }
         return 1;  #we handled the command, even if we did get an exception
     }
@@ -1566,7 +1566,7 @@ sub columnExcludeMap
             }
         } else {
             #not a java exception:
-            printf STDERR "%s[showTableCommand]: eval FAILED:  %s\n", __PACKAGE__, $@;
+            printf STDERR "%s[columnExcludeMap]: eval FAILED:  %s\n", __PACKAGE__, $@;
         }
         return ();  #empty list
     }
