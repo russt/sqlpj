@@ -926,8 +926,8 @@ sub new
         'mJdbcUser' => undef,
         'mJdbcPassword' => undef,
         'mJdbcPropsFileName' => undef,
-        'mVersionNumber' => "1.35",
-        'mVersionDate'   => "16-Feb-2013",
+        'mVersionNumber' => "1.36",
+        'mVersionDate'   => "27-Feb-2013",
         'mPathSeparator' => undef,
         'mDebug'         => 0,
         'mDDebug'        => 0,
@@ -1354,6 +1354,8 @@ sub new
         'mCsvDisplay'   => 0,          #if true, display result-sets as comma-separated-data
         'mHeaderSetting' => 1,         #if true, display table headers with data (default is on)
         'mPathSeparator' => $cfg->getPathSeparator(),
+        'mOutputToList'  => 0,
+        'mQueryResult'  => undef,
         }, $class;
 
     #post-attribute init after we bless our $self (allows use of accessor methods):
@@ -1635,7 +1637,11 @@ sub sql_exec
             printf STDERR "\tsql_exec:  get results...\n" if ($DEBUG);
             $results = $stmt->getResultSet();
             printf STDERR "\tsql_exec:  display results...\n" if ($DEBUG);
-            $self->fastDisplayResultSet($results);
+            if ($self->getIsMysql()) {
+                $self->fastDisplayResultSet($results);
+            } else {
+                $self->displayResultSet($results, &columnExcludeMap($results, ()));
+            }
         } else {
             #no results - see if we have an update count
             printf STDERR "\tsql_exec:  no results...get update count\n" if ($DEBUG);
@@ -1727,6 +1733,9 @@ sub fastDisplayResultSet
 
     return 0 unless defined($rset);
 
+    #value-result parameter:
+    $self->setQueryResult(undef) if ($self->getOutputToList());
+
     #this is a constant from the metadata for a given resultSet:
     my $m        = $rset->getMetaData();
     my $colcnt   = $m->getColumnCount();
@@ -1773,8 +1782,14 @@ sub fastDisplayResultSet
 
     print STDERR "\n" if (!$QUIET && $dot >= 1000);
 
-    if ($self->suppressOutput) {
-        printf STDERR "%s: INFO: supressing display of %d query results (-nooutput specified).\n", $self->progName(), $dot;
+    if ($self->getOutputToList()) {
+        $self->setQueryResult(\@datarows);
+        printf STDERR "%s: INFO: saved %d query results, use getQueryResult() to access.\n", $self->progName(), $dot if ($VERBOSE);
+        return 1;
+    }
+
+    if ($self->suppressOutput()) {
+        printf STDERR "%s: INFO: supressing display of %d query results (-nooutput specified).\n", $self->progName(), $dot if ($VERBOSE);
         return 1;
     }
 
@@ -3114,6 +3129,36 @@ sub setPrompt
     my ($self, $value) = @_;
     $self->{'mPrompt'} = $value;
     return $self->{'mPrompt'};
+}
+
+sub getOutputToList
+#return value of OutputToList
+{
+    my ($self) = @_;
+    return $self->{'mOutputToList'};
+}
+
+sub setOutputToList
+#set value of OutputToList and return value.
+{
+    my ($self, $value) = @_;
+    $self->{'mOutputToList'} = $value;
+    return $self->{'mOutputToList'};
+}
+
+sub getQueryResult
+#return value of QueryResult
+{
+    my ($self) = @_;
+    return $self->{'mQueryResult'};
+}
+
+sub setQueryResult
+#set value of QueryResult and return value.
+{
+    my ($self, $value) = @_;
+    $self->{'mQueryResult'} = $value;
+    return $self->{'mQueryResult'};
 }
 
 sub jdbcClassPath

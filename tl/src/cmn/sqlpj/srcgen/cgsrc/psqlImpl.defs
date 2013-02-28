@@ -60,6 +60,8 @@ PL_OBJ_ATTRIBUTES := << EOF
 'mCsvDisplay'   => 0,          #if true, display result-sets as comma-separated-data
 'mHeaderSetting' => 1,         #if true, display table headers with data (default is on)
 'mPathSeparator' => $cfg->getPathSeparator(),
+'mOutputToList'  => 0,
+'mQueryResult'  => undef,
 EOF
 %evalmacro PL_OBJ_ATTRIBUTES PL_OBJ_ATTRIBUTES
 
@@ -85,33 +87,37 @@ getset_methods =
 
 #generate read/write (get/set) accessors:
 PL_ATTRIBUTE_NAME = Connection
-%evalmacro >> getset_methods pl_getset
+    %evalmacro >> getset_methods pl_getset
 PL_ATTRIBUTE_NAME = MetaData
-%evalmacro >> getset_methods pl_getset
+    %evalmacro >> getset_methods pl_getset
 PL_ATTRIBUTE_NAME = JdbcUrl
-%evalmacro >> getset_methods pl_getset
+    %evalmacro >> getset_methods pl_getset
 PL_ATTRIBUTE_NAME = DatabaseName
-%evalmacro >> getset_methods pl_getset
+    %evalmacro >> getset_methods pl_getset
 PL_ATTRIBUTE_NAME = DatabaseProductName
-%evalmacro >> getset_methods pl_getset
+    %evalmacro >> getset_methods pl_getset
 PL_ATTRIBUTE_NAME = IsOracle
-%evalmacro >> getset_methods pl_getset
+    %evalmacro >> getset_methods pl_getset
 PL_ATTRIBUTE_NAME = IsMysql
-%evalmacro >> getset_methods pl_getset
+    %evalmacro >> getset_methods pl_getset
 PL_ATTRIBUTE_NAME = IsDerby
-%evalmacro >> getset_methods pl_getset
+    %evalmacro >> getset_methods pl_getset
 PL_ATTRIBUTE_NAME = IsFirebird
-%evalmacro >> getset_methods pl_getset
+    %evalmacro >> getset_methods pl_getset
 PL_ATTRIBUTE_NAME = SqlTables
-%evalmacro >> getset_methods pl_getset
+    %evalmacro >> getset_methods pl_getset
 PL_ATTRIBUTE_NAME = XmlDisplay
-%evalmacro >> getset_methods pl_getset
+    %evalmacro >> getset_methods pl_getset
 PL_ATTRIBUTE_NAME = CsvDisplay
-%evalmacro >> getset_methods pl_getset
+    %evalmacro >> getset_methods pl_getset
 PL_ATTRIBUTE_NAME = HeaderSetting
-%evalmacro >> getset_methods pl_getset
+    %evalmacro >> getset_methods pl_getset
 PL_ATTRIBUTE_NAME = Prompt
-%evalmacro >> getset_methods pl_getset
+    %evalmacro >> getset_methods pl_getset
+PL_ATTRIBUTE_NAME = OutputToList
+    %evalmacro >> getset_methods pl_getset
+PL_ATTRIBUTE_NAME = QueryResult
+    %evalmacro >> getset_methods pl_getset
 
 ##########
 #read-only attributes:
@@ -237,7 +243,11 @@ sub sql_exec
             printf STDERR "\tsql_exec:  get results...\n" if ($DEBUG);
             $results = $stmt->getResultSet();
             printf STDERR "\tsql_exec:  display results...\n" if ($DEBUG);
-            $self->fastDisplayResultSet($results);
+            if ($self->getIsMysql()) {
+                $self->fastDisplayResultSet($results);
+            } else {
+                $self->displayResultSet($results, &columnExcludeMap($results, ()));
+            }
         } else {
             #no results - see if we have an update count
             printf STDERR "\tsql_exec:  no results...get update count\n" if ($DEBUG);
@@ -329,6 +339,9 @@ sub fastDisplayResultSet
 
     return 0 unless defined($rset);
 
+    #value-result parameter:
+    $self->setQueryResult(undef) if ($self->getOutputToList());
+
     #this is a constant from the metadata for a given resultSet:
     my $m        = $rset->getMetaData();
     my $colcnt   = $m->getColumnCount();
@@ -375,8 +388,14 @@ sub fastDisplayResultSet
 
     print STDERR "\n" if (!$QUIET && $dot >= 1000);
 
-    if ($self->suppressOutput) {
-        printf STDERR "%s: INFO: supressing display of %d query results (-nooutput specified).\n", $self->progName(), $dot;
+    if ($self->getOutputToList()) {
+        $self->setQueryResult(\@datarows);
+        printf STDERR "%s: INFO: saved %d query results, use getQueryResult() to access.\n", $self->progName(), $dot if ($VERBOSE);
+        return 1;
+    }
+
+    if ($self->suppressOutput()) {
+        printf STDERR "%s: INFO: supressing display of %d query results (-nooutput specified).\n", $self->progName(), $dot if ($VERBOSE);
         return 1;
     }
 
