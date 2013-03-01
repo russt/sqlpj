@@ -447,7 +447,7 @@ sub new
         }, $class;
 
     #post-attribute init after we bless our $self (allows use of accessor methods):
-    #printf STDERR "%s:  constructing table object for '%s'\n", $pkgname, $self->tableName();
+    #printf STDERR "%s:  constructing table object for '%s'\n", ::srline(), $self->tableName();
     $self->setTableAttributes();
 
     return $self;
@@ -505,7 +505,7 @@ sub setTableAttributes
                 $autoIncrementColumns{$cname} = $m->isAutoIncrement($ii);
             }
         } else {
-            printf STDERR "%s[setTableAttributes]:  cannot exec DUMMY query on %s\n", $pkgname, $tblname;
+            printf STDERR "%s:  cannot exec DUMMY query on %s\n", ::srline(), $tblname;
         }
 
         #######
@@ -636,9 +636,9 @@ sub setTableAttributes
     if ($@) {
         if (&Inline::Java::caught("java.sql.SQLException")){
             my $msg = $@->getMessage() ;
-            printf STDERR "%s[setTableAttributes]:  Java exception: '%s'\n", $pkgname, $msg;
+            printf STDERR "%s:  Java exception: '%s'\n", ::srline(), $msg;
         } else {
-            printf STDERR "%s[setTableAttributes]:  ERROR: '%s'\n",$pkgname, $@;
+            printf STDERR "%s:  ERROR: '%s'\n", ::srline(), $@;
         }
         return;
     }
@@ -926,8 +926,8 @@ sub new
         'mJdbcUser' => undef,
         'mJdbcPassword' => undef,
         'mJdbcPropsFileName' => undef,
-        'mVersionNumber' => "1.36",
-        'mVersionDate'   => "27-Feb-2013",
+        'mVersionNumber' => "1.37",
+        'mVersionDate'   => "28-Feb-2013",
         'mPathSeparator' => undef,
         'mDebug'         => 0,
         'mDDebug'        => 0,
@@ -1550,11 +1550,11 @@ sub sqlsession
 {
     my ($self, $aFh, $fn) = @_;
 
-#printf STDERR "%s[sqlsession]: reading from file '%s'\n", $pkgname, $fn;
-#printf STDERR "%s[sqlsession]: aFh is a '%s'\n", $pkgname, ref($aFh);
+#printf STDERR "%s: reading from file '%s'\n", ::srline(), $fn;
+#printf STDERR "%s: aFh is a '%s'\n", ::srline(), ref($aFh);
 
     if (!$self->sql_init_connection()) {
-        printf STDERR "%s:[sqlsession]:  cannot get a database connection:  ABORT\n", $pkgname;
+        printf STDERR "%s:  cannot get a database connection:  ABORT\n", ::srline();
         return 0;
     }
 
@@ -1661,17 +1661,17 @@ sub sql_exec
             (my $xcptnName = $xcptn->toString()) =~ s/:.*//;
 
             if ( isSqlException($xcptnName) ) {
-                printf STDERR "%s[sql_exec]: %s\n", __PACKAGE__, $xcptn->getMessage();
+                printf STDERR "%s: %s\n", ::srline(), $xcptn->getMessage();
                 #dump the buffer:
                 printf STDERR "Buffer Contents:\n%s\n", $sqlbuf;
             } else {
                 #java exception, but not an java.sql exception:
-                printf STDERR "%s[sql_exec]: ", __PACKAGE__;
+                printf STDERR "%s: ", ::srline();
                 $xcptn->printStackTrace();
             }
         } else {
             #not a java exception:
-            printf STDERR "%s[sql_exec]: eval FAILED:  %s\n", __PACKAGE__, $@;
+            printf STDERR "%s: eval FAILED:  %s\n", ::srline(), $@;
         }
         return 0;
     }
@@ -1963,15 +1963,15 @@ require Inline::Java;
 
             if ( $xcptnName =~ /ClassNotFoundException/ ) {
                 #dump the buffer:
-                printf STDERR "%s[check_driver]:  JDBC->load_driver(%s): '%s'\n", __PACKAGE__, $self->jdbcDriver(), $xcptn->getMessage();
+                printf STDERR "%s:  JDBC->load_driver(%s): '%s'\n", ::srline(), $self->jdbcDriver(), $xcptn->getMessage();
             } else {
                 #java exception, but not ClassNotFoundException:
-                printf STDERR "%s[check_driver]: JDBC->load_driver(%s): ", __PACKAGE__, $self->jdbcDriver();
+                printf STDERR "%s: JDBC->load_driver(%s): ", ::srline(), $self->jdbcDriver();
                 $xcptn->printStackTrace();
             }
         } else {
             #not a java exception:
-            printf STDERR "%s[check_driver]: eval FAILED:  %s\n", __PACKAGE__, $@;
+            printf STDERR "%s: eval FAILED:  %s\n", ::srline(), $@;
         }
         return 0;
     }
@@ -2032,14 +2032,14 @@ sub sql_init_connection
             (my $xcptnName = $xcptn->toString()) =~ s/:.*//;
 
             if ( isSqlException($xcptnName) ) {
-                printf STDERR "%s[sql_init_connection]: SQL Connection FAILED: '%s'\n", __PACKAGE__, $xcptn->getMessage();
+                printf STDERR "%s: SQL Connection FAILED: '%s'\n", ::srline(), $xcptn->getMessage();
             } else {
-                printf STDERR "%s[sql_init_connection]: SQL Connection FAILED: ", __PACKAGE__;
+                printf STDERR "%s: SQL Connection FAILED: ", ::srline();
                 $xcptn->printStackTrace();
             }
         } else {
             #not a java exception:
-            printf STDERR "%s[sql_init_connection]: eval FAILED:  %s\n", __PACKAGE__, $@;
+            printf STDERR "%s: eval FAILED:  %s\n", ::srline(), $@;
         }
         return 0;
     }
@@ -2071,14 +2071,14 @@ sub sql_close_connection
             (my $xcptnName = $xcptn->toString()) =~ s/:.*//;
 
             if ( isSqlException($xcptnName) ) {
-                printf STDERR "%s[sql_close_connection]: '%s'\n", __PACKAGE__, $xcptn->getMessage();
+                printf STDERR "%s: '%s'\n", ::srline(), $xcptn->getMessage();
             } else {
-                printf STDERR "%s[sql_close_connection]: ", __PACKAGE__;
+                printf STDERR "%s: ", ::srline();
                 $xcptn->printStackTrace();
             }
         } else {
             #not a java exception:
-            printf STDERR "%s[sql_close_connection]: eval FAILED:  %s\n", __PACKAGE__, $@;
+            printf STDERR "%s: eval FAILED:  %s\n", ::srline(), $@;
         }
         return 0;
     }
@@ -2312,7 +2312,7 @@ sub showCreate
     #limit to one table?
     if ($tblname ne "") {
         if (!defined($tbl = $tables->tableByName($tblname))) {
-            printf STDERR "%s [showCreate]:  table '%s' not found\n", $pkgname, $tblname;
+            printf STDERR "%s:  table '%s' not found\n", ::srline(), $tblname;
             return 1;    #ERROR
         }
 
@@ -2384,14 +2384,14 @@ sub showIndicesCommand
             (my $xcptnName = $xcptn->toString()) =~ s/:.*//;
 
             if ( isSqlException($xcptnName) ) {
-                printf STDERR "%s[showIndicesCommand]: SQL Connection FAILED: '%s'\n", __PACKAGE__, $xcptn->getMessage();
+                printf STDERR "%s: SQL Connection FAILED: '%s'\n", ::srline(), $xcptn->getMessage();
             } else {
-                printf STDERR "%s[showIndicesCommand]: SQL Connection FAILED: ", __PACKAGE__;
+                printf STDERR "%s: SQL Connection FAILED: ", ::srline();
                 $xcptn->printStackTrace();
             }
         } else {
             #not a java exception:
-            printf STDERR "%s[showIndicesCommand]: eval FAILED:  %s\n", __PACKAGE__, $@;
+            printf STDERR "%s: eval FAILED:  %s\n", ::srline(), $@;
         }
         return 1;  #we handled the command, even if we did get an exception
     }
@@ -2500,14 +2500,14 @@ sub showTableCommand
             (my $xcptnName = $xcptn->toString()) =~ s/:.*//;
 
             if ( isSqlException($xcptnName) ) {
-                printf STDERR "%s[showTableCommand]: '%s'\n", __PACKAGE__, $xcptn->getMessage();
+                printf STDERR "%s: '%s'\n", ::srline(), $xcptn->getMessage();
             } else {
-                printf STDERR "%s[showTableCommand]: ", __PACKAGE__;
+                printf STDERR "%s: ", ::srline();
                 $xcptn->printStackTrace();
             }
         } else {
             #not a java exception:
-            printf STDERR "%s[showTableCommand]: eval FAILED:  %s\n", __PACKAGE__, $@;
+            printf STDERR "%s: eval FAILED:  %s\n", ::srline(), $@;
         }
         return 1;  #we handled the command, even if we did get an exception
     }
@@ -2565,14 +2565,14 @@ sub getTableAttributes
             (my $xcptnName = $xcptn->toString()) =~ s/:.*//;
 
             if ( isSqlException($xcptnName) ) {
-                printf STDERR "%s[getTableAttributes]: '%s'\n", __PACKAGE__, $xcptn->getMessage();
+                printf STDERR "%s: '%s'\n", ::srline(), $xcptn->getMessage();
             } else {
-                printf STDERR "%s[getTableAttributes]: ", __PACKAGE__;
+                printf STDERR "%s: ", ::srline();
                 $xcptn->printStackTrace();
             }
         } else {
             #not a java exception:
-            printf STDERR "%s[getTableAttributes]: eval FAILED:  %s\n", __PACKAGE__, $@;
+            printf STDERR "%s: eval FAILED:  %s\n", ::srline(), $@;
         }
         return 1;  #we handled the command, even if we did get an exception
     }
@@ -2588,7 +2588,7 @@ sub getTableAttributes
     for (@allrows) {
         my ($name, $type, $size) = @{$_};
 
-        push @tableColumnDescriptions, sprintf("%s[%s%d]", $name, $type, $size);
+        push @tableColumnDescriptions, sprintf("%s", $name, $type, $size);
     }
 
     return ($tblname, \@tableColumnDescriptions);
@@ -2637,14 +2637,14 @@ sub showSchemaCommand
             (my $xcptnName = $xcptn->toString()) =~ s/:.*//;
 
             if ( isSqlException($xcptnName) ) {
-                printf STDERR "%s[showSchemaCommand]: '%s'\n", __PACKAGE__, $xcptn->getMessage();
+                printf STDERR "%s: '%s'\n", ::srline(), $xcptn->getMessage();
             } else {
-                printf STDERR "%s[showSchemaCommand]: ", __PACKAGE__;
+                printf STDERR "%s: ", ::srline();
                 $xcptn->printStackTrace();
             }
         } else {
             #not a java exception:
-            printf STDERR "%s[showSchemaCommand]: eval FAILED:  %s\n", __PACKAGE__, $@;
+            printf STDERR "%s: eval FAILED:  %s\n", ::srline(), $@;
         }
         return 1;  #we handled the command, even if we did get an exception
     }
@@ -2742,14 +2742,14 @@ sub showTablesCommand
             (my $xcptnName = $xcptn->toString()) =~ s/:.*//;
 
             if ( isSqlException($xcptnName) ) {
-                printf STDERR "%s[showTablesCommand]: '%s'\n", __PACKAGE__, $xcptn->getMessage();
+                printf STDERR "%s: '%s'\n", ::srline(), $xcptn->getMessage();
             } else {
-                printf STDERR "%s[showTablesCommand]: ", __PACKAGE__;
+                printf STDERR "%s: ", ::srline();
                 $xcptn->printStackTrace();
             }
         } else {
             #not a java exception:
-            printf STDERR "%s[showTablesCommand]: eval FAILED:  %s\n", __PACKAGE__, $@;
+            printf STDERR "%s: eval FAILED:  %s\n", ::srline(), $@;
         }
         return 1;  #we handled the command, even if we did get an exception
     }
@@ -3273,14 +3273,14 @@ sub columnExcludeMap
             (my $xcptnName = $xcptn->toString()) =~ s/:.*//;
 
             if ( isSqlException($xcptnName) ) {
-                printf STDERR "%s[columnExcludeMap]: '%s'\n", __PACKAGE__, $xcptn->getMessage();
+                printf STDERR "%s: '%s'\n", ::srline(), $xcptn->getMessage();
             } else {
-                printf STDERR "%s[columnExcludeMap]: ", __PACKAGE__;
+                printf STDERR "%s: ", ::srline();
                 $xcptn->printStackTrace();
             }
         } else {
             #not a java exception:
-            printf STDERR "%s[columnExcludeMap]: eval FAILED:  %s\n", __PACKAGE__, $@;
+            printf STDERR "%s: eval FAILED:  %s\n", ::srline(), $@;
         }
         return ();  #empty list
     }
@@ -3317,14 +3317,14 @@ sub getColumns
             (my $xcptnName = $xcptn->toString()) =~ s/:.*//;
 
             if ( isSqlException($xcptnName) ) {
-                printf STDERR "%s[getColumns]: '%s'\n", __PACKAGE__, $xcptn->getMessage();
+                printf STDERR "%s: '%s'\n", ::srline(), $xcptn->getMessage();
             } else {
-                printf STDERR "%s[getColumns]: ", __PACKAGE__;
+                printf STDERR "%s: ", ::srline();
                 $xcptn->printStackTrace();
             }
         } else {
             #not a java exception:
-            printf STDERR "%s[getColumns]: eval FAILED:  %s\n", __PACKAGE__, $@;
+            printf STDERR "%s: eval FAILED:  %s\n", ::srline(), $@;
         }
         return ();  #empty list
     }
@@ -3356,14 +3356,14 @@ sub getTableName
             (my $xcptnName = $xcptn->toString()) =~ s/:.*//;
 
             if ( isSqlException($xcptnName) ) {
-                printf STDERR "%s[getTableName]: '%s'\n", __PACKAGE__, $xcptn->getMessage();
+                printf STDERR "%s: '%s'\n", ::srline(), $xcptn->getMessage();
             } else {
-                printf STDERR "%s[getTableName]: ", __PACKAGE__;
+                printf STDERR "%s: ", ::srline();
                 $xcptn->printStackTrace();
             }
         } else {
             #not a java exception:
-            printf STDERR "%s[getTableName]: eval FAILED:  %s\n", __PACKAGE__, $@;
+            printf STDERR "%s: eval FAILED:  %s\n", ::srline(), $@;
         }
         return "";  #empty string
     }
@@ -3396,14 +3396,14 @@ sub getColumnSizes
             (my $xcptnName = $xcptn->toString()) =~ s/:.*//;
 
             if ( isSqlException($xcptnName) ) {
-                printf STDERR "%s[getColumnSizes]: '%s'\n", __PACKAGE__, $xcptn->getMessage();
+                printf STDERR "%s: '%s'\n", ::srline(), $xcptn->getMessage();
             } else {
-                printf STDERR "%s[getColumnSizes]: ", __PACKAGE__;
+                printf STDERR "%s: ", ::srline();
                 $xcptn->printStackTrace();
             }
         } else {
             #not a java exception:
-            printf STDERR "%s[getColumnSizes]: eval FAILED:  %s\n", __PACKAGE__, $@;
+            printf STDERR "%s: eval FAILED:  %s\n", ::srline(), $@;
         }
         return ();  #empty list
     }
@@ -3461,14 +3461,14 @@ sub getRow
             (my $xcptnName = $xcptn->toString()) =~ s/:.*//;
 
             if ( isSqlException($xcptnName) ) {
-                printf STDERR "%s[getRow]: '%s'\n", __PACKAGE__, $xcptn->getMessage();
+                printf STDERR "%s: '%s'\n", ::srline(), $xcptn->getMessage();
             } else {
-                printf STDERR "%s[getRow]: ", __PACKAGE__;
+                printf STDERR "%s: ", ::srline();
                 $xcptn->printStackTrace();
             }
         } else {
             #not a java exception:
-            printf STDERR "%s[getRow]: eval FAILED:  %s\n", __PACKAGE__, $@;
+            printf STDERR "%s: eval FAILED:  %s\n", ::srline(), $@;
         }
         return ();  #empty list
     }
@@ -3599,7 +3599,7 @@ sub main
     if ( $scfg->getExecCommandString() ) {
         #...if we have an immediate command to execute, then do it and exit:
         if (!$psqlImpl->sql_init_connection()) {
-            printf STDERR "%s:[sqlsession]:  cannot get a database connection:  ABORT\n", $pkgname;
+            printf STDERR "%s:  cannot get a database connection:  ABORT\n", $pkgname;
             return 1;
         } else {
             my $lbuf = $scfg->getExecCommandString();
@@ -3867,5 +3867,6 @@ sub init
 sub cleanup
 {
 }
+
 1;
 } #end of sqlpj

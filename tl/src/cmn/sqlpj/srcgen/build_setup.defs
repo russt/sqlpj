@@ -6,8 +6,8 @@
 ###########
 # note - version is initialized in pkgconfig.defs
 # TODO:  initialize these from:  cvs log -h psqlImpl.defs
-VERSION_STR  = 1.36
-VERSION_DATE = 27-Feb-2013
+VERSION_STR  = 1.37
+VERSION_DATE = 28-Feb-2013
 ###########
 
 %pragma trim_multiline_rnewline 1

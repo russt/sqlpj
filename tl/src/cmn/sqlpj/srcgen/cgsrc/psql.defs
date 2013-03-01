@@ -120,7 +120,7 @@ if (!$psqlImpl->check_driver()) {
 if ( $scfg->getExecCommandString() ) {
     #...if we have an immediate command to execute, then do it and exit:
     if (!$psqlImpl->sql_init_connection()) {
-        printf STDERR "%s:[sqlsession]:  cannot get a database connection:  ABORT\n", $pkgname;
+        printf STDERR "%s:  cannot get a database connection:  ABORT\n", $pkgname;
         return 1;
     } else {
         my $lbuf = $scfg->getExecCommandString();

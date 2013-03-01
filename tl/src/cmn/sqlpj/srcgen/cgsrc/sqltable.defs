@@ -49,7 +49,7 @@ EOF
 
 #this is for further initialzation of attributes, since hash init cannot be self-referential:
 PL_POST_ATTRIBUTE_INIT := << EOF
-#printf STDERR "%s:  constructing table object for '%s'\n", $pkgname, $self->tableName();
+#printf STDERR "%s:  constructing table object for '%s'\n", ::srline(), $self->tableName();
 $self->setTableAttributes();
 EOF
 %evalmacro PL_POST_ATTRIBUTE_INIT PL_POST_ATTRIBUTE_INIT
@@ -134,7 +134,7 @@ sub setTableAttributes
                 $autoIncrementColumns{$cname} = $m->isAutoIncrement($ii);
             }
         } else {
-            printf STDERR "%s[setTableAttributes]:  cannot exec DUMMY query on %s\n", $pkgname, $tblname;
+            printf STDERR "%s:  cannot exec DUMMY query on %s\n", ::srline(), $tblname;
         }
 
         #######
@@ -265,9 +265,9 @@ sub setTableAttributes
     if ($@) {
         if (&Inline::Java::caught("java.sql.SQLException")){
             my $msg = $@->getMessage() ;
-            printf STDERR "%s[setTableAttributes]:  Java exception: '%s'\n", $pkgname, $msg;
+            printf STDERR "%s:  Java exception: '%s'\n", ::srline(), $msg;
         } else {
-            printf STDERR "%s[setTableAttributes]:  ERROR: '%s'\n",$pkgname, $@;
+            printf STDERR "%s:  ERROR: '%s'\n", ::srline(), $@;
         }
         return;
     }
