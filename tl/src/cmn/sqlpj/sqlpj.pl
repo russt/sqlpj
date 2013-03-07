@@ -926,8 +926,8 @@ sub new
         'mJdbcUser' => undef,
         'mJdbcPassword' => undef,
         'mJdbcPropsFileName' => undef,
-        'mVersionNumber' => "1.37",
-        'mVersionDate'   => "28-Feb-2013",
+        'mVersionNumber' => "1.38",
+        'mVersionDate'   => "06-Mar-2013",
         'mPathSeparator' => undef,
         'mDebug'         => 0,
         'mDDebug'        => 0,
@@ -1784,7 +1784,7 @@ sub fastDisplayResultSet
 
     if ($self->getOutputToList()) {
         $self->setQueryResult(\@datarows);
-        printf STDERR "%s: INFO: saved %d query results, use getQueryResult() to access.\n", $self->progName(), $dot if ($VERBOSE);
+        printf STDERR "%s: saved %d query results, use getQueryResult() to access.\n", ::srline(), $dot if ($DEBUG);
         return 1;
     }
 

@@ -390,7 +390,7 @@ sub fastDisplayResultSet
 
     if ($self->getOutputToList()) {
         $self->setQueryResult(\@datarows);
-        printf STDERR "%s: INFO: saved %d query results, use getQueryResult() to access.\n", $self->progName(), $dot if ($VERBOSE);
+        printf STDERR "%s: saved %d query results, use getQueryResult() to access.\n", ::srline(), $dot if ($DEBUG);
         return 1;
     }
 
