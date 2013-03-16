@@ -69,6 +69,7 @@ PL_PACKAGE_DESCRIPTION = Main driver for sqlpj - a command-line SQL interpreter 
 {
 PL_EXTERN_PKG_IMPORTS = << [
 use Config;
+require "os.pl";
 ]
 
 PL_PKG_IMPORTS = << [
@@ -166,7 +167,7 @@ sub rec_signal
 #printf STDERR "psqlImpl=%s connection=%s\n", ref($psqlImpl), ref($psqlImpl->getConnection());
 
     #reinitialize the connection if we got that far:
-    if ($psqlImpl->getConnection()) {
+    if (defined($psqlImpl) && $psqlImpl->getConnection()) {
         #none of this works...don't know how to recover the JVM or SQL connections.  RT 2/8/13
         #Inline::Java->reconnect_JVM();
         #JDBC->load_driver($psqlImpl->jdbcDriver());
@@ -299,3 +300,8 @@ if ($#ARGV >= 0) {
 EOF
 } #end of parse arg defs
 
+PL_CLEANUP_ROUTINE := << [
+if (defined($psqlImpl)) {
+    $psqlImpl->cleanup();
+}
+]

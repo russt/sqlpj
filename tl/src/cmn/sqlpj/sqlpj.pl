@@ -926,8 +926,8 @@ sub new
         'mJdbcUser' => undef,
         'mJdbcPassword' => undef,
         'mJdbcPropsFileName' => undef,
-        'mVersionNumber' => "1.38",
-        'mVersionDate'   => "06-Mar-2013",
+        'mVersionNumber' => "1.39",
+        'mVersionDate'   => "15-Mar-2013",
         'mPathSeparator' => undef,
         'mDebug'         => 0,
         'mDDebug'        => 0,
@@ -1616,7 +1616,7 @@ sub sql_exec
     #ensure no semi-colon(s) at end of buffer:
     $sqlbuf =~ s/;[;\s]*$//;
 
-    printf STDERR "sql_exec: buf='%s'\n", $sqlbuf if ($DEBUG);
+    printf STDERR "sql_exec: buf='%s'\n", $sqlbuf if ($DDEBUG);
 
     my $stmt = undef;
     my $con  = $self->getConnection();
@@ -1630,13 +1630,13 @@ sub sql_exec
 
         my $updateCount = -1;
 
-        printf STDERR "sql_exec: BEGIN exceute...\n" if ($DEBUG);
+        printf STDERR "sql_exec: BEGIN exceute...\n" if ($DDEBUG);
 
         #if we have results...
         if ($stmt->execute($sqlbuf)) {
-            printf STDERR "\tsql_exec:  get results...\n" if ($DEBUG);
+            printf STDERR "\tsql_exec:  get results...\n" if ($DDEBUG);
             $results = $stmt->getResultSet();
-            printf STDERR "\tsql_exec:  display results...\n" if ($DEBUG);
+            printf STDERR "\tsql_exec:  display results...\n" if ($DDEBUG);
             if ($self->getIsMysql()) {
                 $self->fastDisplayResultSet($results);
             } else {
@@ -1644,7 +1644,7 @@ sub sql_exec
             }
         } else {
             #no results - see if we have an update count
-            printf STDERR "\tsql_exec:  no results...get update count\n" if ($DEBUG);
+            printf STDERR "\tsql_exec:  no results...get update count\n" if ($DDEBUG);
             $updateCount = $stmt->getUpdateCount();
 
             #if we have an update count...
@@ -1653,7 +1653,7 @@ sub sql_exec
             }
         }
     };
-    printf STDERR "sql_exec: END exceute.\n" if ($DEBUG);
+    printf STDERR "sql_exec: END exceute.\n" if ($DDEBUG);
 
     if ($@) {
         if (Inline::Java::caught("java.lang.Exception")) {
@@ -1742,7 +1742,7 @@ sub fastDisplayResultSet
 
     my $tableName = &getTableName($rset);
 
-    printf STDERR "getHeaderSetting=%d\n", $self->getHeaderSetting() if ($DEBUG);
+    printf STDERR "getHeaderSetting=%d\n", $self->getHeaderSetting() if ($DDEBUG);
 
     #we need headers to tag xml elements - make sure they are turned on:
     $self->setHeaderSetting(1) if ($self->getXmlDisplay());
@@ -1784,7 +1784,7 @@ sub fastDisplayResultSet
 
     if ($self->getOutputToList()) {
         $self->setQueryResult(\@datarows);
-        printf STDERR "%s: saved %d query results, use getQueryResult() to access.\n", ::srline(), $dot if ($DEBUG);
+        printf STDERR "%s: saved %d query results, use getQueryResult() to access.\n", ::srline(), $dot if ($DDEBUG);
         return 1;
     }
 
@@ -2078,7 +2078,8 @@ sub sql_close_connection
             }
         } else {
             #not a java exception:
-            printf STDERR "%s: eval FAILED:  %s\n", ::srline(), $@;
+            #for now, silently ignore unless debugging.
+            printf STDERR "%s: eval FAILED:  %s\n", ::srline(), $@ if ($DEBUG);
         }
         return 0;
     }
@@ -2917,6 +2918,25 @@ sub callMetaFunc
     printf "%-56s %s\n", $func, $valstr;
 }
 
+sub cleanup
+#clean up connection and Inline dir, if it exists
+{
+    my ($self) = @_;
+    my $inlinedir = '_Inline';
+
+    printf STDERR "closing sql connection...\n" if ($DEBUG);
+    $self->sql_close_connection();
+
+    if (-d $inlinedir) {
+        printf STDERR "removing '%s'\n", $inlinedir  if ($DEBUG);
+        os::rm_recursive($inlinedir);
+        if (-d $inlinedir) {
+            printf STDERR "%s:  ERROR: can't remove output dir, '%s'\n", ::srline(), $inlinedir;
+            return 1;
+        }
+    }
+}
+
 #########
 #accessor methods for sqlpjImpl object attributes:
 #########
@@ -3531,7 +3551,6 @@ sub isSqlException
     return ( $xcptnName =~ /sql/i );
 }
 
-
 1;
 } #end of sqlpj::sqlpjImpl
 {
@@ -3546,6 +3565,7 @@ my $pkgname = __PACKAGE__;
 
 #imports:
 use Config;
+require "os.pl";
 
 
 #standard global options:
@@ -3645,7 +3665,7 @@ sub rec_signal
 #printf STDERR "psqlImpl=%s connection=%s\n", ref($psqlImpl), ref($psqlImpl->getConnection());
 
     #reinitialize the connection if we got that far:
-    if ($psqlImpl->getConnection()) {
+    if (defined($psqlImpl) && $psqlImpl->getConnection()) {
         #none of this works...don't know how to recover the JVM or SQL connections.  RT 2/8/13
         #Inline::Java->reconnect_JVM();
         #JDBC->load_driver($psqlImpl->jdbcDriver());
@@ -3866,6 +3886,9 @@ sub init
 
 sub cleanup
 {
+    if (defined($psqlImpl)) {
+        $psqlImpl->cleanup();
+    }
 }
 
 1;
